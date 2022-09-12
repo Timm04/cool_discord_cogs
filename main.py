@@ -30,6 +30,7 @@ class CustomCommandTree(discord.app_commands.CommandTree):
         else:
             log.error('Ignoring exception in command tree', exc_info=error)
 
+
 class DJTBot(commands.Bot):
 
     def __init__(self):
@@ -102,7 +103,8 @@ class DJTBot(commands.Bot):
         print("Loaded 'backup' cog.")
 
     async def load_experimental_cogs(self):
-        pass
+        await self.load_extension("cogs.polling")
+        print("Loaded 'polling' cog.")
 
     async def open_json_file(self, guild, filename, empty_data_container, general_data=False):
         def open_json(guild, filename, empty_data_container, general_data):

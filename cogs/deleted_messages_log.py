@@ -56,7 +56,7 @@ class DeletedMessagesLog(commands.Cog):
                                             f"at {current_time_string} UTC.")
         content_embed.set_thumbnail(url=message.author.display_avatar.url)
         if message.content:
-            content_embed.add_field(name="Message content:", value=message.content)
+            content_embed.add_field(name="Message content:", value=message.content[0:1000])
 
         information_string = f"Name: {message.author}" \
                              f"\nMention: {message.author.mention}" \

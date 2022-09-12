@@ -45,6 +45,7 @@ class BackupData(commands.Cog):
 
     @tasks.loop(hours=24)
     async def backup_data(self):
+        await asyncio.sleep(3000)
         backup_file_name = await self.create_backup()
         upload_success = await self.upload_backup(backup_file_name)
         if upload_success:

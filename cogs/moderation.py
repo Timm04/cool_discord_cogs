@@ -108,7 +108,7 @@ class ModerationModal(discord.ui.Modal):
                                              f"\n**Reason**: `{reason}`")
             else:
                 report_embed.add_field(name=f"Unpin",
-                                       value=f"**Message**` : [Jump To Message]({self.target_object.jump_url})"
+                                       value=f"**Message** : [Jump To Message]({self.target_object.jump_url})"
                                              f"\n**Reason**: `{reason}`")
 
             await interaction.channel.send(embed=report_embed)

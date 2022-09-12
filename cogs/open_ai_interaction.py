@@ -92,8 +92,6 @@ class OpenAIReply(commands.Cog):
 
     async def generate_message(self, prompt, guild):
         current_status = await self.bot.open_json_file(guild, "open_ai_status.json", False)
-        if not current_status:
-            return "OpenAI bot is currently deactivated in this guild."
 
         api_key_list = await self.bot.open_json_file("no_guild", "open_ai_keys.json", list(), general_data=True)
         try:
@@ -104,6 +102,9 @@ class OpenAIReply(commands.Cog):
                    f"\n- You can add a new API key to the bot using the command `/add_openai_key`" \
                    f"\n- You can get an OpenAI key by signing up for a free trial on https://beta.openai.com/." \
                    f"\nTo sign up you need a phone number, but you can use any free SMS receiver for sign up."
+
+        if not current_status:
+            return f"OpenAI bot is currently deactivated in this guild. There are {len(api_key)} API keys available."
 
         prompt = prompt.replace("@", " ")
         prompt = prompt.replace("古明地さとり", "Satori, ")
@@ -187,16 +188,17 @@ class OpenAIReply(commands.Cog):
     async def on_message(self, message: discord.Message):
         if not message.guild:
             return
-        current_status = await self.bot.open_json_file(message.guild, "open_ai_status.json", False)
-        if not current_status:
-            await message.channel.send("OpenAI bot is currently deactivated in this guild")
-            return
         mention = f"<@{self.bot.user.id}>"
         if message.author == self.bot.user:
             return
         if message.author.bot:
             return
         if mention in message.content:
+
+            current_status = await self.bot.open_json_file(message.guild, "open_ai_status.json", False)
+            if not current_status:
+                return
+
             ai_message = await self.reply_to_message(message)
             try:
                 await message.reply(ai_message, allowed_mentions=discord.AllowedMentions.none())
@@ -209,6 +211,11 @@ class OpenAIReply(commands.Cog):
         except AttributeError:
             pass
         if replied_to_user_id == self.bot.user.id:
+
+            current_status = await self.bot.open_json_file(message.guild, "open_ai_status.json", False)
+            if not current_status:
+                return
+
             history_strings = await self.fetch_history(message.reference.cached_message)
             history_strings.reverse()
             history = '\n'.join(history_strings)

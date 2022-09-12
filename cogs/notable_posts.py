@@ -38,14 +38,9 @@ class NotablePosts(commands.Cog):
                                                 f"Channel: `{channel.name}`\n"
                                                 f"Reaction count: `{reaction_count}`")
 
-    async def get_reaction_count(self, reaction_message: discord.Message):
-        total_reaction_count = 0
-        for reaction in reaction_message.reactions:
-            if reaction.count == 1:
-                continue
-            else:
-                total_reaction_count += reaction.count
-        return total_reaction_count
+    async def highest_reaction_count(self, reaction_message: discord.Message):
+        highest_reaction_count = max([reaction.count for reaction in reaction_message.reactions])
+        return highest_reaction_count
 
     async def entry_exists(self, reaction_message):
         guild_notable_posts = self.notable_post_info[reaction_message.guild.id]
@@ -69,7 +64,7 @@ class NotablePosts(commands.Cog):
         notable_posts_channel = discord.utils.get(member.guild.channels, name=channel_name)
         if not notable_posts_channel:
             raise ValueError("Notable posts channel not found.")
-        message_reaction_count = await self.get_reaction_count(reaction.message)
+        message_reaction_count = await self.highest_reaction_count(reaction.message)
         if message_reaction_count >= needed_reaction_count:
             await self.create_notable_post(notable_posts_channel, reaction.message, message_reaction_count)
 
@@ -110,7 +105,7 @@ class NotablePosts(commands.Cog):
         for guild in self.bot.guilds:
             guild_notable_posts = self.notable_post_info[guild.id]
             for embed_message, reaction_message, old_reaction_count in list(guild_notable_posts.values()):
-                current_reaction_count = await self.get_reaction_count(reaction_message)
+                current_reaction_count = await self.highest_reaction_count(reaction_message)
                 if current_reaction_count != old_reaction_count:
                     await self.edit_notable_post(embed_message, reaction_message)
 
