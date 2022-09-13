@@ -19,6 +19,14 @@ class Polling(commands.Cog):
                 print(f"Loaded poll with ID {poll_id}")
                 self.bot.add_view(poll_view)
 
+    async def cog_unload(self):
+        for guild in self.bot.guilds:
+            active_polls = await self.bot.open_json_file(guild, "active_polls.json", dict())
+            for poll_id in active_polls:
+                poll_settings = active_polls[poll_id]
+                poll_view = await create_poll_view(poll_settings)
+                poll_view.stop()
+
 
     @discord.app_commands.command(
         name="poll",
@@ -311,7 +319,17 @@ class PollSelect(discord.ui.Select):
         votes = list(self.values)
         votes.append(vote_weight)
         vote_data[str(interaction.user.id)] = votes
+        await self.edit_message(interaction, vote_data)
         await interaction.client.write_json_file(interaction.guild, f"{self.poll_id}:votes.json", vote_data)
+
+    async def edit_message(self, interaction: discord.Interaction, vote_data):
+        poll_message = interaction.message
+        poll_embed = poll_message.embeds[0]
+        users_voted_field = discord.utils.get(poll_embed.fields, name="Vote Progress")
+        if users_voted_field:
+            poll_embed.remove_field(-1)
+        poll_embed.add_field(name="Vote Progress", value=f"`{len(vote_data)}` users have voted so far.")
+        await poll_message.edit(embed=poll_embed, view=self.view)
 
     async def vote_allowed(self, interaction: discord.Interaction):
         vote_allowed = False
@@ -431,10 +449,21 @@ class PollEndButton(discord.ui.Button):
             result_embed.add_field(name=f"{index + 1}.", value=f"`{option}` with `{vote_result[option]}` votes.",
                                    inline=False)
 
+        # Stop listening to View.
         self.view.stop()
+
+        # Remove votes data
         os.remove(f"data/{interaction.guild.id}/{self.poll_id}:votes.json")
+
+        # Remove poll from active polls
         active_polls = await interaction.client.open_json_file(interaction.guild, "active_polls.json", dict())
         del active_polls[self.poll_id]
         await interaction.client.write_json_file(interaction.guild, "active_polls.json", active_polls)
+
+        # Edit post
+        poll_message = interaction.message
+        poll_embed = poll_message.embeds[0]
+        poll_embed.add_field(name="Finished", value="The poll has ended.")
+        await poll_message.edit(embed=poll_embed, view=None)
 
         await interaction.response.send_message(embed=result_embed)

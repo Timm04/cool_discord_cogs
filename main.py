@@ -101,10 +101,13 @@ class DJTBot(commands.Bot):
         print("Loaded 'notable posts' cog.")
         await self.load_extension("cogs.backup")
         print("Loaded 'backup' cog.")
-
-    async def load_experimental_cogs(self):
         await self.load_extension("cogs.polling")
         print("Loaded 'polling' cog.")
+        await self.load_extension("cogs.channel_clearer")
+        print("Loaded 'channel clearer' cog.")
+
+    async def load_experimental_cogs(self):
+        pass
 
     async def open_json_file(self, guild, filename, empty_data_container, general_data=False):
         def open_json(guild, filename, empty_data_container, general_data):
