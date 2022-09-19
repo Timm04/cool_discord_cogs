@@ -91,6 +91,8 @@ class NicknameCounter(commands.Cog):
                 member = guild.get_member(int(user_id))
                 if not member:
                     continue
+                if len(user_nickname_data[user_id]) > 32:
+                    continue
                 await asyncio.sleep(5)
                 await self.update_user_nickname(member, user_nickname_data[user_id])
 
