@@ -27,7 +27,6 @@ class Polling(commands.Cog):
                 poll_view = await create_poll_view(poll_settings)
                 poll_view.stop()
 
-
     @discord.app_commands.command(
         name="poll",
         description="Create a poll.")
@@ -60,10 +59,14 @@ async def create_settings_view(poll_settings):
     return buttons_view
 
 
-async def send_settings_message(interaction: discord.Interaction, poll_name, poll_id, vote_count, options=None,
-                                allowed_roles=["@everyone"], role_weights=None):
-
-    settings_embed = discord.Embed(title=poll_name, description=f"Poll with the unique ID: `{poll_id}`")
+async def create_poll_embed(interaction, poll_name, poll_id, vote_count, options, allowed_roles, role_weights,
+                            creator_id=None):
+    if not creator_id:
+        creator = interaction.user
+    else:
+        creator = interaction.guild.get_member(creator_id)
+    settings_embed = discord.Embed(title=poll_name,
+                                   description=f"Poll by {creator.mention} with the unique ID: `{poll_id}`")
     if options:
         settings_embed.add_field(name="Vote Options", value="\n".join([f"• {option}" for option in options]),
                                  inline=False)
@@ -89,6 +92,14 @@ async def send_settings_message(interaction: discord.Interaction, poll_name, pol
             role_weight = role_weights[role_name]
             role_weight_strings.append(f"{role.mention} : `{role_weight}`")
         settings_embed.add_field(name="Role weights", value="\n".join(role_weight_strings))
+
+    return settings_embed
+
+
+async def send_settings_message(interaction: discord.Interaction, poll_name, poll_id, vote_count, options=None,
+                                allowed_roles=["@everyone"], role_weights=None):
+    settings_embed = await create_poll_embed(interaction, poll_name, poll_id, vote_count, options, allowed_roles,
+                                             role_weights)
 
     poll_settings = (poll_name, poll_id, vote_count, options, allowed_roles, role_weights, interaction.user.id)
     buttons_view = await create_settings_view(poll_settings)
@@ -245,31 +256,13 @@ async def send_poll_message(interaction, poll_settings):
         await interaction.response.send_message("You forgot to set up voting options!", ephemeral=True)
         return
 
-    settings_embed = discord.Embed(title=poll_name, description=f"Poll by {interaction.user.mention} with the unique ID: `{poll_id}`")
-    settings_embed.add_field(name="Vote Options", value="\n".join([f"• {option}" for option in options]), inline=False)
-    settings_embed.add_field(name="Vote Count", value=vote_count)
-
-    role_list = [discord.utils.get(interaction.guild.roles, name=role_name) for role_name in allowed_roles]
-    role_list = [role for role in role_list if role]
-    if role_list:
-        settings_embed.add_field(name="Allowed roles", value="\n".join([f"{role.mention}" for role in role_list]),
-                                 inline=False)
-    else:
-        settings_embed.add_field(name="Allowed roles", value=interaction.guild.default_role.mention, inline=False)
-
-    if role_weights:
-        role_weight_strings = []
-        for role_name in role_weights:
-            role = discord.utils.get(interaction.guild.roles, name=role_name)
-            if not role:
-                continue
-            role_weight = role_weights[role_name]
-            role_weight_strings.append(f"{role.mention} : `{role_weight}`")
-        settings_embed.add_field(name="Role weights", value="\n".join(role_weight_strings))
+    settings_embed = await create_poll_embed(interaction, poll_name, poll_id, vote_count, options, allowed_roles,
+                                             role_weights)
 
     poll_view = await create_poll_view(poll_settings)
 
-    await interaction.response.send_message(embed=settings_embed,
+    await interaction.response.send_message(f"`{poll_name}`",
+                                            embed=settings_embed,
                                             view=poll_view,
                                             allowed_mentions=discord.AllowedMentions.none())
 
@@ -298,10 +291,10 @@ async def create_poll_view(poll_settings):
 # Vote Select
 class PollSelect(discord.ui.Select):
     def __init__(self, poll_settings):
-        poll_name, self.poll_id, vote_count, options, self.allowed_roles, self.role_weights, creator_id = poll_settings
-        if vote_count > len(options):
-            vote_count = len(options)
-        super().__init__(custom_id=self.poll_id + ":select", max_values=vote_count)
+        self.poll_name, self.poll_id, self.vote_count, self.vote_options, self.allowed_roles, self.role_weights, self.creator_id = poll_settings
+        if self.vote_count > len(self.vote_options):
+            self.vote_count = len(self.vote_options)
+        super().__init__(custom_id=self.poll_id + ":select", max_values=self.vote_count)
 
     async def callback(self, interaction: discord.Interaction):
 
@@ -324,7 +317,9 @@ class PollSelect(discord.ui.Select):
 
     async def edit_message(self, interaction: discord.Interaction, vote_data):
         poll_message = interaction.message
-        poll_embed = poll_message.embeds[0]
+        poll_embed = await create_poll_embed(interaction, self.poll_name, self.poll_id, self.vote_count,
+                                             self.vote_options,
+                                             self.allowed_roles, self.role_weights, self.creator_id)
         users_voted_field = discord.utils.get(poll_embed.fields, name="Vote Progress")
         if users_voted_field:
             poll_embed.remove_field(-1)
@@ -365,23 +360,44 @@ class PollVoteInfoButton(discord.ui.Button):
                          style=discord.ButtonStyle.primary)
 
     async def callback(self, interaction: discord.Interaction):
+        if not interaction.user.dm_channel:
+            await interaction.user.create_dm()
+
         if interaction.user.id != self.creator_id:
             vote_data = await self.get_user_vote_info(interaction)
             if not vote_data:
                 return
 
             vote_string, vote_weight = vote_data
+            try:
+                await interaction.user.dm_channel.send(f"You have voted for: {vote_string}\n"
+                                                       f"Your vote weight is `{vote_weight}`")
+            except discord.errors.HTTPException:
+                pass
+
             await interaction.response.send_message(f"You have voted for: {vote_string}\n"
                                                     f"Your vote weight is `{vote_weight}`",
                                                     ephemeral=True)
         else:
             vote_data_string = await self.get_all_vote_info(interaction)
+
+            try:
+                await interaction.user.dm_channel.send(vote_data_string)
+            except discord.errors.HTTPException:
+                pass
+
             await interaction.response.send_message(vote_data_string, ephemeral=True)
 
     async def get_user_vote_info(self, interaction: discord.Interaction):
         vote_data = await interaction.client.open_json_file(interaction.guild, f"{self.poll_id}:votes.json", dict())
         user_vote_data = vote_data.get(str(interaction.user.id), None)
         if not user_vote_data:
+
+            try:
+                await interaction.user.dm_channel.send(f"You haven't voted yet.")
+            except discord.errors.HTTPException:
+                pass
+
             await interaction.response.send_message("You haven't voted yet.", ephemeral=True)
             return False
         vote_weight = user_vote_data.pop()

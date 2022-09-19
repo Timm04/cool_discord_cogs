@@ -66,14 +66,14 @@ class AssignableRoles(commands.Cog):
                         f"{interaction.user.mention} You are not allowed to self-assign roles.")
                     return
 
-        view_object = discord.ui.View(timeout=40)
+        view_object = discord.ui.View(timeout=60)
         my_role_selection = await self.load_options(interaction)
         if my_role_selection:
             view_object.add_item(my_role_selection)
             await interaction.response.send_message(
                 f"{interaction.user.mention} Select roles to **add** to yourself:", view=view_object)
         await view_object.wait()
-        await interaction.edit_original_response(content="Command call timed out.", view=None)
+        await interaction.delete_original_response()
 
     @discord.app_commands.command(
         name="remove_roles",

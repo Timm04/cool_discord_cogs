@@ -27,8 +27,13 @@ class EmojiManager(commands.Cog):
     async def add_emoji(self, interaction: discord.Interaction, emoji_name: str, emoji_file: discord.Attachment):
         await interaction.response.defer()
 
+        if emoji_file.size > 33554432:
+            await interaction.edit_original_response(content="File size is too large.")
+            return
+
         if emoji_file.width != emoji_file.height:
             await interaction.edit_original_response(content="Emoji size and width have to match.")
+            return
 
         emoji_bytes = await emoji_file.read()
         custom_emoji = await interaction.guild.create_custom_emoji(name=emoji_name, image=emoji_bytes, reason=f"Custom emoji by {str(interaction.user)}")

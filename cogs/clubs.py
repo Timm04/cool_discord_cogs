@@ -119,14 +119,15 @@ async def works_autocomplete(interaction: discord.Interaction, current_input: st
     challenge_prefix = interaction.command.name.split("_")[0]
     work_data = await interaction.client.open_json_file(interaction.guild, f"clubs/{challenge_prefix}_work_data.json",
                                                         dict())
-    work_names_and_ids = []
+
+    possible_choices = []
     for short_id in work_data:
         full_name = work_data[short_id][0]
-        work_names_and_ids.append(short_id)
-        work_names_and_ids.append(full_name)
+        relevant_period = work_data[short_id][1] + "-" + work_data[short_id][2]
 
-    possible_choices = [discord.app_commands.Choice(name=work_name_or_id, value=work_name_or_id) for work_name_or_id
-                        in work_names_and_ids if current_input.lower() in work_name_or_id.lower()]
+        if current_input.lower() in short_id.lower() or current_input.lower() in full_name.lower():
+            possible_choices.append(discord.app_commands.Choice(name=f"{short_id} ({relevant_period})", value=short_id))
+            possible_choices.append(discord.app_commands.Choice(name=f"{full_name} ({relevant_period})", value=full_name))
 
     return possible_choices[0:25]
 
@@ -479,7 +480,7 @@ class ReviewModal(discord.ui.Modal):
         self.channel = channel
         self.manager_role = manager_role
 
-    review = discord.ui.TextInput(label='Review:', style=discord.TextStyle.paragraph)
+    review = discord.ui.TextInput(label='Review:', style=discord.TextStyle.paragraph, min_length=500)
 
     async def on_submit(self, interaction: discord.Interaction):
         review_embed = discord.Embed(title=f"{self.work_name} review by {str(interaction.user)}",
@@ -524,7 +525,7 @@ class Clubs(commands.Cog):
                                    work_name="The work you want to review")
     @discord.app_commands.autocomplete(club=clubs_autocomplete,
                                        work_name=works_namespace_autocomplete)
-    @discord.app_commands.default_permissions(administrator=True)
+    @discord.app_commands.default_permissions(send_messages=True)
     async def review(self, interaction: discord.Interaction, club: str, work_name: str):
         club_data = await self.bot.open_json_file(interaction.guild, "clubs/club_data.json", dict())
         for club_abbreviation in club_data:
@@ -784,7 +785,7 @@ class Clubs(commands.Cog):
 
     @tasks.loop(minutes=10)
     async def create_and_update_pins(self):
-        await asyncio.sleep(600)
+        await asyncio.sleep(300)
         for guild in self.bot.guilds:
             club_data = await self.bot.open_json_file(guild, "clubs/club_data.json", dict())
             for club_abbreviation in club_data:
@@ -803,7 +804,7 @@ class Clubs(commands.Cog):
                 await asyncio.sleep(10)
                 channel_pins = await club_channel.pins()
                 pins_by_self = [pin for pin in channel_pins if pin.author.id == self.bot.user.id and pin.embeds
-                                and pin.content == ""]
+                                and pin.content == "" and not pin.components]
 
                 try:
                     await asyncio.sleep(5)

@@ -215,9 +215,12 @@ class JoinAndLeave(commands.Cog):
         rank_system = await self.bot.open_json_file(member.guild, "rank_system.json", list())
         for rank in rank_system:
             role_name_to_check = rank[6]
+            second_role_name_to_check = rank[5]
             for role in member.roles:
                 if role.name == role_name_to_check:
                     return role_name_to_check
+                elif role.name == second_role_name_to_check:
+                    return second_role_name_to_check
 
         return "no rank data"
 

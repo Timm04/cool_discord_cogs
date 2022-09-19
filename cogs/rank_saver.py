@@ -86,6 +86,7 @@ class RankSaver(commands.Cog):
         if role_names:
             await asyncio.sleep(8)
             roles_to_restore = [discord.utils.get(member.guild.roles, name=role_name) for role_name in role_names]
+            roles_to_restore = [role for role in roles_to_restore if role]
             roles_to_remove = [role for role in member.roles if role.name != "@everyone"]
             await member.remove_roles(*roles_to_remove)
             await member.add_roles(*roles_to_restore)

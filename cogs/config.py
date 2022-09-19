@@ -31,6 +31,13 @@ class Config(commands.Cog):
 
     @commands.command(hidden=True)
     @commands.is_owner()
+    async def synctest(self, ctx):
+        self.bot.tree.copy_global_to(guild=discord.Object(id=960552410529538118))
+        await self.bot.tree.sync(guild=discord.Object(id=960552410529538118))
+        await ctx.send("Synced commands to guild with id 960552410529538118.")
+
+    @commands.command(hidden=True)
+    @commands.is_owner()
     async def clear_global_commands(self, ctx):
         self.bot.tree.clear_commands(guild=None)
         await self.bot.tree.sync()

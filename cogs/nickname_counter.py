@@ -34,6 +34,11 @@ class NicknameCounter(commands.Cog):
         await interaction.response.defer()
         if "XXXX" not in nickname:
             await interaction.edit_original_response(content="You have to include `XXXX` in your nickname as a placeholder.")
+            return
+
+        if len(nickname) > 32:
+            await interaction.edit_original_response(content="Nickname has to be shorter than 32 symbols.")
+            return
 
         current_date_string = datetime.utcnow().strftime("%Y-%m-%d")
 
@@ -51,7 +56,7 @@ class NicknameCounter(commands.Cog):
         relevant_date = datetime.strptime(date_string, "%Y-%m-%d")
         current_date_string = datetime.utcnow().strftime("%Y-%m-%d")
         current_date = datetime.strptime(current_date_string, "%Y-%m-%d")
-        time_difference_in_days = int((relevant_date - current_date).days)
+        time_difference_in_days = int((current_date - relevant_date).days)
         if count_up_or_down == "Up":
             current_counter = starting_number + time_difference_in_days
         else:
@@ -86,6 +91,7 @@ class NicknameCounter(commands.Cog):
                 member = guild.get_member(int(user_id))
                 if not member:
                     continue
+                await asyncio.sleep(5)
                 await self.update_user_nickname(member, user_nickname_data[user_id])
 
 

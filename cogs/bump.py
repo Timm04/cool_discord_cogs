@@ -88,6 +88,7 @@ class BumpReminder(commands.Cog):
                 bot_message = await self.bot.wait_for('message', check=check_if_bot,
                                                       timeout=minutes_until_next_bump * 60)
             except asyncio.TimeoutError:
+                await bump_channel.guild.text_channels[0].send(f"Bump ready in {bump_channel.mention}.")
                 await bump_channel.send(f"Bump now with {self.bump_bots[bump_bot.id][1]}")
                 minutes_until_next_bump = self.bump_bots[bump_bot.id][2]
                 continue

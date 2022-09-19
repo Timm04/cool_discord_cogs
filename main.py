@@ -8,7 +8,8 @@ import logging
 import traceback
 
 log = logging.getLogger(__name__)
-
+testing_mode = False
+testing_cog = "cogs.state_saver"
 
 class CustomCommandTree(discord.app_commands.CommandTree):
     def __init__(self, bot):
@@ -36,8 +37,12 @@ class DJTBot(commands.Bot):
     def __init__(self):
         super().__init__(command_prefix="$", intents=discord.Intents.all(), help_command=None,
                          tree_cls=CustomCommandTree)
-        with open("data/token.txt") as token_file:
-            self.token = token_file.read()
+        if not testing_mode:
+            with open("data/token.txt") as token_file:
+                self.token = token_file.read()
+        else:
+            with open("data/testing_token.txt") as token_file:
+                self.token = token_file.read()
 
     async def on_error(self, event_method: str, /, *args, **kwargs):
         log.exception('Ignoring exception in %s', event_method)
@@ -56,9 +61,14 @@ class DJTBot(commands.Bot):
         await self.change_presence(activity=game)
 
         print(f"Logged in as {self.user}")
-        await self.load_essential_cogs()
-        await self.load_standard_cogs()
-        await self.load_experimental_cogs()
+        if not testing_mode:
+            await self.load_essential_cogs()
+            await self.load_standard_cogs()
+            await self.load_experimental_cogs()
+        else:
+            await self.load_essential_cogs()
+            await self.load_extension(testing_cog)
+            print(f"Loaded {testing_cog} cog.")
 
     async def load_essential_cogs(self):
         await self.load_extension("cogs.setup_logging")
@@ -105,9 +115,12 @@ class DJTBot(commands.Bot):
         print("Loaded 'polling' cog.")
         await self.load_extension("cogs.channel_clearer")
         print("Loaded 'channel clearer' cog.")
+        await self.load_extension("cogs.state_saver")
+        print("Loaded 'state saver' cog.")
 
     async def load_experimental_cogs(self):
         pass
+
 
     async def open_json_file(self, guild, filename, empty_data_container, general_data=False):
         def open_json(guild, filename, empty_data_container, general_data):
