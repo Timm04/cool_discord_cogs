@@ -1,4 +1,4 @@
-"""Cog to give people self givable roles."""
+"""Self assignable roles."""
 import discord
 from discord.ext import commands
 from discord.ext import tasks
@@ -90,7 +90,7 @@ class AssignableRoles(commands.Cog):
             await interaction.edit_original_response(content="Command call timed out.", view=None)
 
     @discord.app_commands.command(
-        name="add_role_to_assignable",
+        name="_add_role_to_assignable",
         description="Add a role to the list of self assignable roles.")
     @discord.app_commands.default_permissions(administrator=True)
     @discord.app_commands.describe(role='The role to add to the list of self-assignables.',
@@ -109,7 +109,7 @@ class AssignableRoles(commands.Cog):
         await interaction.response.send_message(f"Added the role '{role.name}' to the list of self-assignable roles.")
 
     @discord.app_commands.command(
-        name="remove_role_from_assignable",
+        name="_remove_role_from_assignable",
         description="Remove a role from the list of self assignable roles.")
     @discord.app_commands.default_permissions(administrator=True)
     @discord.app_commands.describe(role='The role to add to the list of self-assignables.')
@@ -126,7 +126,7 @@ class AssignableRoles(commands.Cog):
         await interaction.response.send_message(f"Removed the role '{role.name}' from the list of self-assignable roles.")
 
     @discord.app_commands.command(
-        name="toggle_role_assign_permission",
+        name="_toggle_role_assign_permission",
         description="Forbid a role from assigning themselves roles.")
     @discord.app_commands.guild_only()
     @discord.app_commands.describe(role="The role to add to the list of roles that can't self assign.")

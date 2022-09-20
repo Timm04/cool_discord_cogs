@@ -1,4 +1,4 @@
-"""Cog Description"""
+"""Save guild roles/channels/permissions and more"""
 import asyncio
 import io
 import discord
@@ -43,7 +43,7 @@ class StateSaver(commands.Cog):
         self.snapshot_loop.cancel()
 
     @discord.app_commands.command(
-        name="save_snapshot",
+        name="_save_snapshot",
         description="Save the current server state to a file which can be restored later.")
     @discord.app_commands.guild_only()
     @discord.app_commands.default_permissions(administrator=True)
@@ -69,7 +69,7 @@ class StateSaver(commands.Cog):
         return guild_snapshot
 
     @discord.app_commands.command(
-        name="load_snapshot",
+        name="_load_snapshot",
         description="Load a previously saved snapshot.")
     @discord.app_commands.guild_only()
     @discord.app_commands.autocomplete(file_path=snapshot_autocomplete)
@@ -204,7 +204,7 @@ class StateSaver(commands.Cog):
         return guild_snapshopt
 
     @discord.app_commands.command(
-        name="restore_roles",
+        name="_restore_roles",
         description="Manually start the role restorer for the current members.")
     @discord.app_commands.guild_only()
     @discord.app_commands.default_permissions(administrator=True)

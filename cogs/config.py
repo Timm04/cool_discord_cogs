@@ -1,4 +1,4 @@
-"""Generates a configuration file as a basis for other cogs."""
+"""Some key functions required for other cogs."""
 import asyncio
 
 import discord
@@ -21,20 +21,55 @@ class Config(commands.Cog):
 
     async def cog_load(self):
         await self.create_config_folders()
+        loop = asyncio.get_running_loop()
+        loop.create_task(self.thread_joiner())
+
+    async def thread_joiner(self):
+        for guild in self.bot.guilds:
+            guild: discord.Guild
+            for thread in guild.threads:
+                if thread.me:
+                    continue
+                else:
+                    await asyncio.sleep(5)
+                    print(f"Joining thread {thread.name}")
+                    await thread.join()
+
+    @discord.app_commands.command(
+        name="help",
+        description="Get an overview of commands.")
+    @discord.app_commands.guild_only()
+    @discord.app_commands.default_permissions(administrator=True)
+    async def help(self, interaction: discord.Interaction):
+        command_string = ""
+        admin_commands = []
+        for command in self.bot.tree.get_commands():
+            if isinstance(command, discord.app_commands.Command):
+                if command.name.startswith("_"):
+                    admin_commands.append(f"\n**/{command.name}**\n{command.description}\n")
+                else:
+                    command_string += f"\n**/{command.name}**\n{command.description}\n"
+
+        if interaction.user.guild_permissions.administrator:
+            for admin_string in admin_commands:
+                command_string += admin_string
+
+        help_embed = discord.Embed(title="Command Overview", description=command_string)
+
+        await interaction.response.send_message(embed=help_embed, ephemeral=True)
+
+
+
+    @commands.Cog.listener(name="on_thread_create")
+    async def join_threads(self, thread: discord.Thread):
+        await thread.join()
 
     @commands.command(hidden=True)
     @commands.is_owner()
-    async def sync(self, ctx):
-        self.bot.tree.copy_global_to(guild=discord.Object(id=948016353263124521))
-        await self.bot.tree.sync(guild=discord.Object(id=948016353263124521))
-        await ctx.send("Synced commands to guild with id 948016353263124521.")
-
-    @commands.command(hidden=True)
-    @commands.is_owner()
-    async def synctest(self, ctx):
-        self.bot.tree.copy_global_to(guild=discord.Object(id=960552410529538118))
-        await self.bot.tree.sync(guild=discord.Object(id=960552410529538118))
-        await ctx.send("Synced commands to guild with id 960552410529538118.")
+    async def sync(self, ctx: discord.ext.commands.Context):
+        self.bot.tree.copy_global_to(guild=discord.Object(id=ctx.guild.id))
+        await self.bot.tree.sync(guild=discord.Object(id=ctx.guild.id))
+        await ctx.send(f"Synced commands to guild with id {ctx.guild.id}.")
 
     @commands.command(hidden=True)
     @commands.is_owner()
@@ -44,7 +79,7 @@ class Config(commands.Cog):
         await ctx.send("Cleared global commands.")
 
     @discord.app_commands.command(
-        name="reload_cog",
+        name="_reload_cog",
         description="Reload a cog without restarting the bot.")
     @discord.app_commands.default_permissions(administrator=True)
     async def reload_cog(self, interaction: discord.Interaction):
@@ -57,7 +92,7 @@ class Config(commands.Cog):
                                                 ephemeral=True)
 
     @discord.app_commands.command(
-        name="verify_configuration",
+        name="_verify_configuration",
         description="Goes through the config files to ensure everything is in order.")
     @discord.app_commands.guild_only()
     @discord.app_commands.default_permissions(administrator=True)

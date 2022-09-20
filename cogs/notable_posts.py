@@ -1,4 +1,4 @@
-"""Cog Description"""
+"""Send posts with a lot of reactions to seperate channel"""
 import asyncio
 
 import discord
@@ -24,7 +24,7 @@ class NotablePosts(commands.Cog):
         self.update_notable_posts.cancel()
 
     @discord.app_commands.command(
-        name="activate_notable_posts",
+        name="_activate_notable_posts",
         description="Activate reposting of notable posts in an embed.")
     @discord.app_commands.guild_only()
     @discord.app_commands.default_permissions(administrator=True)

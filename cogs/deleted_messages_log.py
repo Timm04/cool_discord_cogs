@@ -1,4 +1,4 @@
-"""Cog Description"""
+"""Save deleted messages."""
 import asyncio
 from datetime import datetime
 from datetime import timedelta
@@ -16,7 +16,7 @@ class DeletedMessagesLog(commands.Cog):
         self.deleter.start()
 
     @discord.app_commands.command(
-        name="setup_logger",
+        name="_setup_logger",
         description="Setup the deleted messages logger.")
     @discord.app_commands.guild_only()
     @discord.app_commands.describe(active="Whether deleted messages should be logged or not.",

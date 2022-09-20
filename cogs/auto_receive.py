@@ -1,4 +1,4 @@
-"""Cog Description"""
+"""Automatically receive roles."""
 import asyncio
 
 import discord
@@ -27,7 +27,7 @@ class AutoReceive(commands.Cog):
         self.give_auto_roles.cancel()
 
     @discord.app_commands.command(
-        name="set_role_auto_receive",
+        name="_set_role_auto_receive",
         description="Set up a role to be automatically assigned to users of another role.")
     @discord.app_commands.guild_only()
     @discord.app_commands.describe(role_to_have="The role users should have.",
@@ -41,7 +41,7 @@ class AutoReceive(commands.Cog):
         await interaction.response.send_message(f"Added `{role_to_have.name} -> {role_to_get.name}` auto receive.")
 
     @discord.app_commands.command(
-        name="remove_auto_receive",
+        name="_remove_auto_receive",
         description="Remove a role auto receive setting.")
     @discord.app_commands.guild_only()
     @discord.app_commands.autocomplete(receive_string=autocomplete_autoreceive)
@@ -55,7 +55,7 @@ class AutoReceive(commands.Cog):
         await interaction.response.send_message(f"Removed the `{role_to_have_name} -> {role_to_receive_name}` assign.")
 
     @discord.app_commands.command(
-        name="ban_auto_receive",
+        name="_ban_auto_receive",
         description="Ban a member from automatically receiving roles.")
     @discord.app_commands.guild_only()
     @discord.app_commands.describe(member="The member that should be banned.",

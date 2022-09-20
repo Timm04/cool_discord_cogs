@@ -1,4 +1,4 @@
-"""Cog Description"""
+"""Rank system interfacing with Kotoba bot"""
 import asyncio
 import os
 import aiohttp
@@ -20,7 +20,7 @@ class levelup(commands.Cog):
         await self.aiosession.close()
 
     @discord.app_commands.command(
-        name="add_ordered_rank",
+        name="_add_ordered_rank",
         description="Add a role to the list of ordered attainable quiz roles."
                     "\nPreviously added has to be cleared first.")
     @discord.app_commands.guild_only()
@@ -83,7 +83,7 @@ class levelup(commands.Cog):
                                                 f"the role that should be removed is `{role_to_lose.name}`")
 
     @discord.app_commands.command(
-        name="destroy_ordered_rank_system",
+        name="_destroy_ordered_rank_system",
         description="Clears the ordered rank system. WARNING: DANGEROUS COMMAND!!")
     @discord.app_commands.guild_only()
     @discord.app_commands.default_permissions(administrator=True)
@@ -93,7 +93,7 @@ class levelup(commands.Cog):
         await interaction.response.send_message("Rank system has been cleared.")
 
     @discord.app_commands.command(
-        name="set_quiz_announce_channel",
+        name="_set_quiz_announce_channel",
         description="Set the channel where passed quizzes should be announced.")
     @discord.app_commands.guild_only()
     @discord.app_commands.describe(channel="The channel in which people passing the quizzes should be announced.")
@@ -103,7 +103,7 @@ class levelup(commands.Cog):
         await interaction.response.send_message("Updated the announce channel for passed quizzes.")
 
     @discord.app_commands.command(
-        name="toggle_quiz_failure_message",
+        name="_toggle_quiz_failure_message",
         description="Toggle whether the bot should say why a quiz failed in a channel.")
     @discord.app_commands.guild_only()
     @discord.app_commands.describe(channel="Channel in which the bot should say why a quiz failed.")

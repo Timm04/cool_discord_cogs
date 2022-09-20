@@ -1,4 +1,4 @@
-"""Cog Description"""
+"""Create a nickname that counts days"""
 import asyncio
 
 import discord
@@ -53,6 +53,8 @@ class NicknameCounter(commands.Cog):
     async def update_user_nickname(self, member: discord.Member, nickname_data):
         await asyncio.sleep(5)
         nickname, count_up_or_down, starting_number, date_string = nickname_data
+        if len(nickname) > 32:
+            return
         relevant_date = datetime.strptime(date_string, "%Y-%m-%d")
         current_date_string = datetime.utcnow().strftime("%Y-%m-%d")
         current_date = datetime.strptime(current_date_string, "%Y-%m-%d")
@@ -90,8 +92,6 @@ class NicknameCounter(commands.Cog):
             for user_id in user_nickname_data:
                 member = guild.get_member(int(user_id))
                 if not member:
-                    continue
-                if len(user_nickname_data[user_id]) > 32:
                     continue
                 await asyncio.sleep(5)
                 await self.update_user_nickname(member, user_nickname_data[user_id])

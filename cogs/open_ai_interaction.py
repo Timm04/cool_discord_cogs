@@ -1,4 +1,4 @@
-"""Cog Description"""
+"""OpenAI chat bot"""
 import discord
 import re
 import asyncio
@@ -33,7 +33,7 @@ class OpenAIReply(commands.Cog):
         await self.bot.write_json_file("no_guild", "open_ai_keys.json", api_key_list, general_data=True)
 
     @discord.app_commands.command(
-        name="edit_openai_prompt",
+        name="_edit_openai_prompt",
         description="Change the prompt for the OpenAI bot.")
     @discord.app_commands.guild_only()
     @discord.app_commands.default_permissions(administrator=True)
@@ -75,7 +75,7 @@ class OpenAIReply(commands.Cog):
             await interaction.delete_original_response()
 
     @discord.app_commands.command(
-        name="toggle_openai",
+        name="_toggle_openai",
         description="Enable/Disable the OpenAI bot.")
     @discord.app_commands.guild_only()
     @discord.app_commands.default_permissions(administrator=True)

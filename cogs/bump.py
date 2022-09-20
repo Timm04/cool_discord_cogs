@@ -1,4 +1,4 @@
-"""Cog Description"""
+"""Bump reminders"""
 import asyncio
 
 import discord
@@ -43,6 +43,7 @@ class BumpReminder(commands.Cog):
             guild: discord.Guild
             bump_channel_name = await self.bot.open_json_file(guild, "bump_channel_name.json", str())
             bump_channel = discord.utils.get(guild.channels, name=bump_channel_name)
+            bump_role = discord.utils.get(guild.roles, name="Bumper")
             if not bump_channel:
                 continue
 
@@ -52,7 +53,7 @@ class BumpReminder(commands.Cog):
                     continue
 
                 loop = asyncio.get_running_loop()
-                loop.create_task(self.bump_reminder(bump_bot, bump_channel))
+                loop.create_task(self.bump_reminder(bump_bot, bump_channel, bump_role))
 
     async def save_time(self, bump_bot):
         wait_time = timedelta(minutes=self.bump_bots[bump_bot.id][2])
@@ -76,7 +77,7 @@ class BumpReminder(commands.Cog):
 
         return minutes_left
 
-    async def bump_reminder(self, bump_bot, bump_channel):
+    async def bump_reminder(self, bump_bot, bump_channel, bump_role):
 
         def check_if_bot(message: discord.Message):
             if message.author == bump_bot and message.guild == bump_bot.guild and message.interaction:
@@ -88,8 +89,11 @@ class BumpReminder(commands.Cog):
                 bot_message = await self.bot.wait_for('message', check=check_if_bot,
                                                       timeout=minutes_until_next_bump * 60)
             except asyncio.TimeoutError:
-                await bump_channel.guild.text_channels[0].send(f"Bump ready in {bump_channel.mention}.")
-                await bump_channel.send(f"Bump now with {self.bump_bots[bump_bot.id][1]}")
+                # await bump_channel.guild.text_channels[0].send(f"Bump ready in {bump_channel.mention}.")
+                bump_message = f"Bump now with {self.bump_bots[bump_bot.id][1]}"
+                if bump_role:
+                    bump_message = bump_role.mention + " " + bump_message
+                await bump_channel.send(bump_message)
                 minutes_until_next_bump = self.bump_bots[bump_bot.id][2]
                 continue
             is_bump = await self.bump_bots[bump_bot.id][3](bot_message)
@@ -103,7 +107,7 @@ class BumpReminder(commands.Cog):
                 minutes_until_next_bump = await self.load_time(bump_bot)
 
     @discord.app_commands.command(
-        name="set_bump_channel",
+        name="_set_bump_channel",
         description="Set the channel in which bump reminders should be dispatched.")
     @discord.app_commands.guild_only()
     @discord.app_commands.default_permissions(administrator=True)

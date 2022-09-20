@@ -1,4 +1,4 @@
-"""Cog Description"""
+"""Cog providing some basic moderator tools"""
 import asyncio
 
 import discord
@@ -215,7 +215,7 @@ class Moderation(commands.Cog):
                                                              callback=self.toggle_pin)
 
     @discord.app_commands.command(
-        name="set_mod_channel",
+        name="_set_mod_channel",
         description="Set a channel for moderation reports.")
     @discord.app_commands.guild_only()
     @discord.app_commands.describe(mod_channel="The channel to which moderation reports get sent.")

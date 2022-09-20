@@ -1,4 +1,4 @@
-"""Cog Description"""
+"""Framework for clubs with a role point system and scoreboard"""
 import asyncio
 import os
 import discord
@@ -541,7 +541,7 @@ class Clubs(commands.Cog):
                 await interaction.response.send_modal(review_modal)
 
     @discord.app_commands.command(
-        name="create_new_club",
+        name="_create_new_club",
         description="Creates a challenge/club. WARNING: Creates slash commands that have to be manually allowed.")
     @discord.app_commands.describe(club_name="The full name of the club.",
                                    club_abbreviation="Short name for the club. Best are 3 small letters like 'vnc'.",
@@ -565,7 +565,7 @@ class Clubs(commands.Cog):
         await self.bot.reload_extension("cogs.clubs")
 
     @discord.app_commands.command(
-        name="add_point_role_to_challenge",
+        name="_add_point_role_to_challenge",
         description="Add a point role to a challenge that is automatically assigned with points earned.")
     @discord.app_commands.guild_only()
     @discord.app_commands.describe(club_abbreviation="Short name for the club.",
@@ -589,7 +589,7 @@ class Clubs(commands.Cog):
                                                 f"`{reference_role.name}`.")
 
     @discord.app_commands.command(
-        name="add_checkpoint_role",
+        name="_add_checkpoint_role",
         description="Add a checkpoint role to a challenge. For example a checkmark at 10 points.")
     @discord.app_commands.guild_only()
     @discord.app_commands.describe(club_abbreviation="Short name for the club.",

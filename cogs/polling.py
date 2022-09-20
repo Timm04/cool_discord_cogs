@@ -1,4 +1,4 @@
-"""Cog Description"""
+"""Create polls"""
 import discord
 import os
 from discord.ext import commands

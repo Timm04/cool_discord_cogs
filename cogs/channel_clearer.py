@@ -1,4 +1,4 @@
-"""Cog Description"""
+"""Regularly clear a channel."""
 import asyncio
 
 import discord
@@ -20,7 +20,7 @@ class ChannelClearer(commands.Cog):
         self.channel_clearer.cancel()
 
     @discord.app_commands.command(
-        name="setup_clearer",
+        name="_setup_clearer",
         description="Sets up a task that deletes a channels content every 24 hours.")
     @discord.app_commands.guild_only()
     @discord.app_commands.default_permissions(administrator=True)

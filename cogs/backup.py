@@ -1,4 +1,4 @@
-"""Cog Description"""
+"""Backup data files to S3"""
 import discord
 import asyncio
 import boto3

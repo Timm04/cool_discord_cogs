@@ -1,4 +1,4 @@
-"""Cog Description"""
+"""Allow creationg of custom roles"""
 import asyncio
 
 import discord
@@ -101,7 +101,7 @@ class CustomRole(commands.Cog):
             await self.bot.write_json_file(member.guild, "custom_role_data.json", custom_role_data)
 
     @discord.app_commands.command(
-        name="activate_custom_roles",
+        name="_activate_custom_roles",
         description="Activate the creation of custom roles.")
     @discord.app_commands.guild_only()
     @discord.app_commands.describe(active="Whether custom role creation should be active.",
@@ -113,7 +113,7 @@ class CustomRole(commands.Cog):
         await interaction.response.send_message(f"Set custom role creation to {active}; Roles sorted under `{reference_role.name}`")
 
     @discord.app_commands.command(
-        name="set_custom_role_perms",
+        name="_set_custom_role_perms",
         description="Allow or disallow a role custom role creation.")
     @discord.app_commands.guild_only()
     @discord.app_commands.describe(role="The role that should be allowed or disallowed.",

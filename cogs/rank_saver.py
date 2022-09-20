@@ -1,4 +1,4 @@
-"""Cog Description"""
+"""Backup role data"""
 import asyncio
 import discord
 from discord.ext import commands
@@ -28,7 +28,7 @@ class RankSaver(commands.Cog):
                 await self.bot.write_json_file(guild, "rank_saver.json", user_roles_dictionary)
 
     @discord.app_commands.command(
-        name="toggle_rank_saver",
+        name="_toggle_rank_saver",
         description="Enable/Disable rank saving.")
     @discord.app_commands.guild_only()
     @discord.app_commands.default_permissions(administrator=True)
@@ -44,7 +44,7 @@ class RankSaver(commands.Cog):
             await interaction.response.send_message("Enabled rank saver.")
 
     @discord.app_commands.command(
-        name="toggle_rank_restorer",
+        name="_toggle_rank_restorer",
         description="Enable/Disable rank restoration.")
     @discord.app_commands.guild_only()
     @discord.app_commands.default_permissions(administrator=True)

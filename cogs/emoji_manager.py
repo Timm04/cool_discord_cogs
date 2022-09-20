@@ -1,4 +1,4 @@
-"""Cog Description"""
+"""Create and backup emoji"""
 import asyncio
 
 import discord
@@ -100,7 +100,7 @@ class EmojiManager(commands.Cog):
         await interaction.response.send_message(embed=emoji_embed, ephemeral=True)
 
     @discord.app_commands.command(
-        name="backup_emoji",
+        name="_backup_emoji",
         description="Download all emoji with usage statistics. WARNING: A lot of API calls.")
     @discord.app_commands.guild_only()
     @discord.app_commands.default_permissions(administrator=True)
@@ -117,7 +117,7 @@ class EmojiManager(commands.Cog):
             if os.path.exists(emoji_save_path):
                 continue
             else:
-                await asyncio.sleep(1)
+                await asyncio.sleep(2)
                 await emoji.save(f"data/{interaction.guild.id}/emoji_backup/{emoji.name + emoji.url[-4:]}")
                 print(f"Downloaded emoji to: data/{interaction.guild.id}/emoji_backup/{emoji.name + emoji.url[-4:]}")
         await interaction.edit_original_response(content=f"{interaction.user.mention} Finished downloading emoji.")
@@ -133,7 +133,7 @@ class EmojiManager(commands.Cog):
 
     @discord.app_commands.command(
         name="download_emoji",
-        description="Send the emoji as a zip file to the chat as well as usage statistics.")
+        description="Send the emoji data as a zip file to the chat as well as usage statistics.")
     @discord.app_commands.guild_only()
     @discord.app_commands.default_permissions(send_messages=True)
     async def download_emoji(self, interaction: discord.Interaction):

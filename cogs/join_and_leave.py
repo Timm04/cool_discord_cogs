@@ -1,4 +1,4 @@
-"""Cog Description"""
+"""Set up join and leave messages"""
 import asyncio
 
 import discord
@@ -82,7 +82,7 @@ class JoinAndLeave(commands.Cog):
         pass
 
     @discord.app_commands.command(
-        name="set_join_msg",
+        name="_set_join_msg",
         description=r"Set up the join message for new members. Templates: <GUILDNAME> <USERMENTION> <CREATIONDATE>")
     @discord.app_commands.guild_only()
     @discord.app_commands.describe(channel="The channel in which join messages should be sent.",
@@ -108,7 +108,7 @@ class JoinAndLeave(commands.Cog):
         await interaction.response.send_modal(input_message_modal)
 
     @discord.app_commands.command(
-        name="set_second_join_msg",
+        name="_set_second_join_msg",
         description=r"Set up an additional join message. Templates: <GUILDNAME> <USERMENTION> <CREATIONDATE>")
     @discord.app_commands.guild_only()
     @discord.app_commands.describe(channel="The channel in which join messages should be sent.",
@@ -131,7 +131,7 @@ class JoinAndLeave(commands.Cog):
         await interaction.response.send_modal(input_message_modal)
 
     @discord.app_commands.command(
-        name="set_leave_msg",
+        name="_set_leave_msg",
         description=r"Set up the leave message for new members  Templates: <USERNAME> <RANK>")
     @discord.app_commands.guild_only()
     @discord.app_commands.describe(channel="The channel to which the leave message should be sent.",
