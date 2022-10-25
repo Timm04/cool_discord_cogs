@@ -74,10 +74,12 @@ class NotablePosts(commands.Cog):
         async with embed_post_lock:
             if await self.entry_exists(reaction_message):
                 return
-            reaction_embed = discord.Embed(description=f"[Jump To Message]({reaction_message.jump_url})")
-            reaction_embed.set_author(name=str(reaction_message.author), icon_url=str(reaction_message.author.avatar.url))
+            description = f"[Jump To Message]({reaction_message.jump_url})"
             if reaction_message.content:
-                reaction_embed.add_field(name="Content:", value=reaction_message.content, inline=False)
+                description += f"\n\n**Content:**\n{reaction_message.content}"
+
+            reaction_embed = discord.Embed(description=description)
+            reaction_embed.set_author(name=str(reaction_message.author), icon_url=str(reaction_message.author.avatar.url))
             if reaction_message.attachments:
                 reaction_embed.add_field(name="Media:", value="The post contained the following image:", inline=False)
                 reaction_embed.set_image(url=reaction_message.attachments[0].url)

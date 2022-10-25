@@ -2,7 +2,7 @@
 /goals.txt
 /.old/
 /.idea/
-/experimental_cogs/
 /scripts/
 /backup/
-/cogs/test.py
+/experimental/
+/cogs/misc.py

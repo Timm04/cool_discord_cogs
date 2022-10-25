@@ -13,7 +13,8 @@ class ChangeMessageModal(discord.ui.Modal):
         self.active = active
         self.upload_file = upload_file
         self.is_join = is_join
-        self.default_role_name = default_role.name
+        if default_role:
+            self.default_role_name = default_role.name
 
     async def on_submit(self, interaction: discord.Interaction):
         await interaction.response.defer(thinking=True)

@@ -9,7 +9,7 @@ import traceback
 
 log = logging.getLogger(__name__)
 testing_mode = False
-testing_cog = "cogs.state_saver"
+testing_cog = "cogs.misc"
 
 class CustomCommandTree(discord.app_commands.CommandTree):
     def __init__(self, bot):
@@ -117,6 +117,8 @@ class DJTBot(commands.Bot):
         print("Loaded 'channel clearer' cog.")
         await self.load_extension("cogs.state_saver")
         print("Loaded 'state saver' cog.")
+        await self.load_extension("cogs.misc")
+        print("Loaded 'misc' cog.")
 
     async def load_experimental_cogs(self):
         pass
