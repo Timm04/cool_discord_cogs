@@ -7,6 +7,7 @@ from discord.ext import tasks
 from datetime import datetime
 from datetime import timedelta
 
+
 class ModerationModal(discord.ui.Modal):
     def __init__(self, action_function_name, target_object, bot):
         super().__init__(title="Moderator Report")
@@ -32,7 +33,7 @@ class ModerationModal(discord.ui.Modal):
             performed_action = await self.delete_message()
             if not performed_action:
                 await interaction.edit_original_response(content=
-                    f"You cannot perform this action on that user, {interaction.user.display_name}!")
+                                                         f"You cannot perform this action on that user, {interaction.user.display_name}!")
                 return
             else:
                 report_embed.add_field(name="Message Deletion",
@@ -52,7 +53,7 @@ class ModerationModal(discord.ui.Modal):
             performed_action = await self.purge_messages()
             if not performed_action:
                 await interaction.edit_original_response(content=
-                    f"You cannot perform this action on that user, {interaction.user.display_name}!")
+                                                         f"You cannot perform this action on that user, {interaction.user.display_name}!")
                 return
             else:
                 messages_content = performed_action[1]
@@ -71,7 +72,7 @@ class ModerationModal(discord.ui.Modal):
             performed_action = await self.timeout_member()
             if not performed_action:
                 await interaction.edit_original_response(content=
-                    f"You cannot perform this action on that user, {interaction.user.display_name}!")
+                                                         f"You cannot perform this action on that user, {interaction.user.display_name}!")
                 return
             hours = performed_action[1]
             report_embed.add_field(name=f"Timeout for {hours} hours",
@@ -85,7 +86,7 @@ class ModerationModal(discord.ui.Modal):
             performed_action = await self.kick_user()
             if not performed_action:
                 await interaction.edit_original_response(content=
-                    f"You cannot perform this action on that user, {interaction.user.display_name}!")
+                                                         f"You cannot perform this action on that user, {interaction.user.display_name}!")
                 return
             print(report_embed)
             report_embed.add_field(name=f"Kick",
@@ -100,7 +101,8 @@ class ModerationModal(discord.ui.Modal):
             try:
                 pin_action = await self.toggle_ping()
             except discord.errors.HTTPException:
-                await interaction.edit_original_response(content=f"Message seems to have been deleted., {interaction.user.display_name}!")
+                await interaction.edit_original_response(
+                    content=f"Message seems to have been deleted., {interaction.user.display_name}!")
                 return
             if pin_action:
                 report_embed.add_field(name=f"Pin",
@@ -115,12 +117,16 @@ class ModerationModal(discord.ui.Modal):
 
         await asyncio.sleep(5)
         await log_channel.send(embed=report_embed)
-        await interaction.edit_original_response(content=f"Thank you for your hard work, {interaction.user.display_name}!")
+        await interaction.edit_original_response(
+            content=f"Thank you for your hard work, {interaction.user.display_name}!")
 
     async def delete_message(self):
         self.target_object: discord.Message
-        if self.target_object.author.guild_permissions.administrator:
-            return False
+        try:
+            if self.target_object.author.guild_permissions.administrator:
+                return False
+        except AttributeError:
+            return True
         await self.target_object.delete()
         return True
 
@@ -133,8 +139,11 @@ class ModerationModal(discord.ui.Modal):
         member_to_purge = self.target_object.author
 
         self.target_object: discord.Message
-        if member_to_purge.guild_permissions.administrator:
-            return False
+        try:
+            if member_to_purge.guild_permissions.administrator:
+                return False
+        except AttributeError:
+            return True
 
         count = 1
 

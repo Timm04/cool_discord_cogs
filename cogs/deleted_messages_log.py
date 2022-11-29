@@ -75,8 +75,11 @@ class DeletedMessagesLog(commands.Cog):
         if message.attachments:
             files = list()
             for attachment in message.attachments:
-                image_file = await attachment.to_file(use_cached=True)
-                files.append(image_file)
+                try:
+                    image_file = await attachment.to_file(use_cached=True)
+                    files.append(image_file)
+                except discord.errors.HTTPException:
+                    return None
             return files
         else:
             return None

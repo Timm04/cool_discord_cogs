@@ -384,9 +384,19 @@ class PollVoteInfoButton(discord.ui.Button):
             try:
                 await interaction.user.dm_channel.send(vote_data_string)
             except discord.errors.HTTPException:
-                pass
+                lines = []
+                for line in vote_data_string.splitlines():
+                    lines.append(line)
+                    if len("\n".join(lines)) > 3000:
+                        await interaction.user.dm_channel.send(embed=discord.Embed(title="Votes", description="\n".join(lines)))
+                        lines = []
+                if lines:
+                    await interaction.user.dm_channel.send(embed=discord.Embed(title="Votes", description="\n".join(lines)))
 
-            await interaction.response.send_message(vote_data_string, ephemeral=True)
+            try:
+                await interaction.response.send_message(vote_data_string, ephemeral=True)
+            except discord.errors.HTTPException:
+                pass
 
     async def get_user_vote_info(self, interaction: discord.Interaction):
         vote_data = await interaction.client.open_json_file(interaction.guild, f"{self.poll_id}:votes.json", dict())
@@ -429,6 +439,30 @@ class PollEndButton(discord.ui.Button):
         super().__init__(custom_id=self.poll_id + ":end", label="End Poll",
                          style=discord.ButtonStyle.danger)
 
+    async def create_vote_embeds(self, vote_summary: list):
+        vote_embeds = []
+        vote_summary.reverse()
+        embed_title = vote_summary.pop()
+        vote_strings = []
+        for user_vote in vote_summary:
+            vote_strings.append(user_vote)
+            vote_string = "\n".join(vote_strings)
+            if not len(vote_string) > 3000:
+                continue
+            else:
+                my_embed = discord.Embed(title=embed_title, description=vote_string)
+                vote_embeds.append(my_embed)
+                vote_strings = []
+                continue
+
+        if vote_strings:
+            vote_string = "\n".join(vote_strings)
+            my_embed = discord.Embed(title=embed_title, description=vote_string)
+            vote_embeds.append(my_embed)
+
+        return vote_embeds
+
+
     async def callback(self, interaction: discord.Interaction):
         delete_permissions = False
         if interaction.user.id == self.creator_id:
@@ -458,12 +492,13 @@ class PollEndButton(discord.ui.Button):
             member_vote_string = ", ".join(member_vote_data)
             vote_summary.append(f"{member_name} voted for {member_vote_string} with vote power `{vote_weight}`.")
 
-        result_embed = discord.Embed(title=f"The poll {self.poll_name} has concluded.",
-                                     description="\n".join(vote_summary))
-        sorted_options = sorted(vote_result, key=vote_result.get)
+        result_embed = discord.Embed(title=f"The poll {self.poll_name} has concluded.")
+        sorted_options = sorted(vote_result, key=vote_result.get, reverse=True)
         for index, option in enumerate(sorted_options):
             result_embed.add_field(name=f"{index + 1}.", value=f"`{option}` with `{vote_result[option]}` votes.",
                                    inline=False)
+
+        vote_embeds = await self.create_vote_embeds(vote_summary)
 
         # Stop listening to View.
         self.view.stop()
@@ -483,3 +518,6 @@ class PollEndButton(discord.ui.Button):
         await poll_message.edit(embed=poll_embed, view=None)
 
         await interaction.response.send_message(embed=result_embed)
+
+        for vote_embed in vote_embeds:
+            await interaction.channel.send(embed=vote_embed)
