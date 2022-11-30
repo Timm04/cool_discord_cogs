@@ -1,4 +1,4 @@
-"""OpenAI chat bot"""
+"""OpenAI chatbot"""
 import discord
 import re
 import asyncio
@@ -42,7 +42,7 @@ class OpenAIReply(commands.Cog):
         change_prompt_modal = ChangePromptModal(self.bot)
         change_prompt_modal.add_item(
             discord.ui.TextInput(label='New Prompt:', style=discord.TextStyle.paragraph, default=current_prompt,
-                                 min_length=100, max_length=1000))
+                                 min_length=100, max_length=1500))
         await interaction.response.send_modal(change_prompt_modal)
 
     @discord.app_commands.command(
@@ -52,7 +52,7 @@ class OpenAIReply(commands.Cog):
     async def add_openai_key(self, interaction: discord.Interaction, openai_key: str):
         openai.api_key = openai_key
         try:
-            completion = openai.Completion.create(engine="text-davinci-002",
+            completion = openai.Completion.create(engine="text-davinci-003",
                                                   prompt="How many human beings exist on planet earth?")
         except openai.error.RateLimitError:
             await interaction.response.send_message("This key has already reached the quota limit.", ephemeral=True)
@@ -104,14 +104,14 @@ class OpenAIReply(commands.Cog):
                    f"\nTo sign up you need a phone number, but you can use any free SMS receiver for sign up."
 
         if not current_status:
-            return f"OpenAI bot is currently deactivated in this guild. There are {len(api_key)} API keys available."
+            return f"OpenAI bot is currently deactivated in this guild. There are {len(api_key_list)} API keys available."
 
         prompt = prompt.replace("@", " ")
         prompt = prompt.replace("古明地さとり", "Satori, ")
         prompt = prompt.replace("A:", "Satori:")
         loop = asyncio.get_running_loop()
         try:
-            completion = await loop.run_in_executor(None, partial(openai.Completion.create, engine="text-davinci-002",
+            completion = await loop.run_in_executor(None, partial(openai.Completion.create, engine="text-davinci-003",
                                                                   prompt=prompt,
                                                                   presence_penalty=2.0,
                                                                   frequency_penalty=2.0,
@@ -130,6 +130,8 @@ class OpenAIReply(commands.Cog):
         ai_reply = re.sub(r"https?://.*\.\w{2,3}", "<snip>", ai_reply)
         if "Q:" in ai_reply:
             ai_reply = ai_reply.split("Q:")[0]
+
+        print(f"{prompt} | {ai_reply}")
         return ai_reply
 
     @discord.app_commands.command(

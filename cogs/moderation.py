@@ -44,7 +44,7 @@ class ModerationModal(discord.ui.Modal):
                                              f"\n**Reason**: `{reason}`")
                 await interaction.channel.send(embed=report_embed)
                 report_embed.add_field(name="**Message Content**",
-                                       value=f"`{self.target_object.content}`",
+                                       value=f"`{self.target_object.content[0:500]}`",
                                        inline=False)
                 report_embed.add_field(name="Attachments",
                                        value=f"Message had `{len(self.target_object.attachments)}` attachments.")
@@ -88,7 +88,6 @@ class ModerationModal(discord.ui.Modal):
                 await interaction.edit_original_response(content=
                                                          f"You cannot perform this action on that user, {interaction.user.display_name}!")
                 return
-            print(report_embed)
             report_embed.add_field(name=f"Kick",
                                    value=f"**Member**: {self.target_object.mention}"
                                          f"\n**Name**: `{str(self.target_object)}`"
@@ -143,7 +142,7 @@ class ModerationModal(discord.ui.Modal):
             if member_to_purge.guild_permissions.administrator:
                 return False
         except AttributeError:
-            return True
+            return False
 
         count = 1
 

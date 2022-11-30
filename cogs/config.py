@@ -67,6 +67,9 @@ class Config(commands.Cog):
     @commands.command(hidden=True)
     @commands.is_owner()
     async def sync(self, ctx: discord.ext.commands.Context):
+        if not ctx.guild:
+            await ctx.reply("Command can only be used in a guild.")
+            return
         self.bot.tree.copy_global_to(guild=discord.Object(id=ctx.guild.id))
         await self.bot.tree.sync(guild=discord.Object(id=ctx.guild.id))
         await ctx.send(f"Synced commands to guild with id {ctx.guild.id}.")

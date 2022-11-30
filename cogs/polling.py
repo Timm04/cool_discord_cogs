@@ -500,12 +500,6 @@ class PollEndButton(discord.ui.Button):
 
         vote_embeds = await self.create_vote_embeds(vote_summary)
 
-        # Stop listening to View.
-        self.view.stop()
-
-        # Remove votes data
-        os.remove(f"data/{interaction.guild.id}/{self.poll_id}:votes.json")
-
         # Remove poll from active polls
         active_polls = await interaction.client.open_json_file(interaction.guild, "active_polls.json", dict())
         del active_polls[self.poll_id]
@@ -521,3 +515,12 @@ class PollEndButton(discord.ui.Button):
 
         for vote_embed in vote_embeds:
             await interaction.channel.send(embed=vote_embed)
+
+        # Stop listening to View.
+        self.view.stop()
+
+        # Remove votes data
+        try:
+            os.remove(f"data/{interaction.guild.id}/{self.poll_id}:votes.json")
+        except FileNotFoundError:
+            print(f"File data/{interaction.guild.id}/{self.poll_id}:votes.json was not found.")

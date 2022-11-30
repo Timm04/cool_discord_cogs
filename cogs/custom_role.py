@@ -138,6 +138,7 @@ class CustomRole(commands.Cog):
         for guild in self.bot.guilds:
             allowed_roles = await self.bot.open_json_file(guild, "custom_creation_allowed_roles.json", list())
             custom_role_data = await self.bot.open_json_file(guild, "custom_role_data.json", dict())
+            new_custom_role_data = await self.bot.open_json_file(guild, "custom_role_data.json", dict())
             for member_id in custom_role_data:
                 member = guild.get_member(int(member_id))
                 if member:
@@ -153,8 +154,8 @@ class CustomRole(commands.Cog):
                     role = guild.get_role(role_id)
                     if role:
                         await role.delete()
-                    del custom_role_data[member_id]
-                    await self.bot.write_json_file(guild, "custom_role_data.json", custom_role_data)
+                    del new_custom_role_data[member_id]
+                    await self.bot.write_json_file(guild, "custom_role_data.json", new_custom_role_data)
 
 async def setup(bot):
     await bot.add_cog(CustomRole(bot))
