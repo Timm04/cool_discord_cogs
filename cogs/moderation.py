@@ -174,8 +174,9 @@ class ModerationModal(discord.ui.Modal):
         except ValueError:
             hours = 0
 
-        if self.target_object.guild_permissions.administrator:
-            return False
+        if self.target_object.guild_permissions:
+            if self.target_object.guild_permissions.administrator:
+                return False
 
         hours_to_timeout = timedelta(hours=hours)
         await self.target_object.timeout(hours_to_timeout, reason=self.children[0].value)

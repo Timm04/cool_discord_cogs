@@ -382,7 +382,6 @@ async def generate_works_embeds(all_work_data, club_name):
 
     return embeds_to_send
 
-
 class PrintOutLeaderboard(discord.app_commands.Command):
     def __init__(self, challenge_prefix, challenge_name, guild_to_register, bot):
         super().__init__(name=f"{challenge_prefix}_leaderboard",
@@ -401,6 +400,9 @@ class PrintOutLeaderboard(discord.app_commands.Command):
         embeds_to_send = await generate_leaderboard_embeds(all_user_data, interaction.guild, self.challenge_name)
         await interaction.response.send_message(embeds=embeds_to_send,
                                                 allowed_mentions=discord.AllowedMentions.none())
+
+async def generate_most_read_embeds(all_work_data, club_name):
+    pass
 
 
 class PrintOutPastWorks(discord.app_commands.Command):
