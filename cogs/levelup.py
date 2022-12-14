@@ -250,7 +250,7 @@ class levelup(commands.Cog):
             announce_channel_name = await self.bot.open_json_file(message.guild, "quiz_announce_channel.json", str())
             if announce_channel_name:
                 announce_channel = discord.utils.get(message.guild.channels, name=announce_channel_name)
-                await announce_channel.send(info)
+                await announce_channel.send(info, file=discord.File(r'data/omedetou.mp4'))
             (quiz_name, answer_count, answer_time_limit, font,
              font_size, role_name_to_get, role_name_to_lose, fail_count, command) = user_rank_data
             await self.give_reward_role(member, role_name_to_get, role_name_to_lose)
