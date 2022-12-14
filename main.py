@@ -119,6 +119,8 @@ class DJTBot(commands.Bot):
         print("Loaded 'state saver' cog.")
         await self.load_extension("cogs.misc")
         print("Loaded 'misc' cog.")
+        await self.load_extension("cogs.quiz_cage")
+        print("Loaded 'quiz cage' cog.")
 
     async def load_experimental_cogs(self):
         pass

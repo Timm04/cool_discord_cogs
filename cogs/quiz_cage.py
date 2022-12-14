@@ -2,7 +2,9 @@
 import discord
 from discord.ext import commands
 from discord.ext import tasks
+import asyncio
 
+update_lock = asyncio.Lock()
 
 class QuizCage(commands.Cog):
 
@@ -60,20 +62,21 @@ class QuizCage(commands.Cog):
         except ValueError:
             return
         quiz_cage_role = discord.utils.get(member_before.guild.roles, name=quiz_cage_role_name)
-        if quiz_cage_role in member_before.roles:
-            quiz_cage_data = await self.bot.open_json_file(member_before.guild, "quiz_cage_data.json", dict())
-            try:
-                role_to_get_name = quiz_cage_data[str(member_before.id)]
-            except KeyError:
-                await member_after.remove_roles(quiz_cage_role)
-                return
-            role_to_get = discord.utils.get(member_before.guild.roles, name=role_to_get_name)
-            if role_to_get in member_after.roles:
-                await member_after.remove_roles(quiz_cage_role)
-                del quiz_cage_data[str(member_before.id)]
-                await self.bot.write_json_file(member_before.guild, "quiz_cage_data.json", quiz_cage_data)
-                update_channel = member_after.guild.get_channel(update_channel_id)
-                await update_channel.send(f"{member_after.mention} got the **{role_to_get_name}** and the quiz cage was lifted.")
+        async with update_lock:
+            if quiz_cage_role in member_before.roles:
+                quiz_cage_data = await self.bot.open_json_file(member_before.guild, "quiz_cage_data.json", dict())
+                try:
+                    role_to_get_name = quiz_cage_data[str(member_before.id)]
+                except KeyError:
+                    await member_after.remove_roles(quiz_cage_role)
+                    return
+                role_to_get = discord.utils.get(member_before.guild.roles, name=role_to_get_name)
+                if role_to_get in member_after.roles:
+                    await member_after.remove_roles(quiz_cage_role)
+                    del quiz_cage_data[str(member_before.id)]
+                    await self.bot.write_json_file(member_before.guild, "quiz_cage_data.json", quiz_cage_data)
+                    update_channel = member_after.guild.get_channel(update_channel_id)
+                    await update_channel.send(f"{member_after.mention} got the **{role_to_get_name}** role and the quiz cage was lifted.")
 
 async def setup(bot):
     await bot.add_cog(QuizCage(bot))
