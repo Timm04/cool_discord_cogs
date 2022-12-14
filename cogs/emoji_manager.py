@@ -8,6 +8,8 @@ import shutil
 from discord.ext import commands
 from discord.ext import tasks
 
+reaction_lock = asyncio.Lock()
+message_lock = asyncio.Lock()
 
 class EmojiManager(commands.Cog):
 
@@ -43,10 +45,11 @@ class EmojiManager(commands.Cog):
     async def emoji_usage_counter_reaction(self, reaction: discord.Reaction, user):
         if not reaction.message.guild:
             return
-        if reaction.emoji in reaction.message.guild.emojis:
-            emoji_usage_dict = await self.bot.open_json_file(reaction.message.guild, "emoji_usage.json", dict())
-            emoji_usage_dict[reaction.emoji.name] = emoji_usage_dict.get(reaction.emoji.name, 0) + 1
-            await self.bot.write_json_file(reaction.message.guild, "emoji_usage.json", emoji_usage_dict)
+        async with reaction_lock:
+            if reaction.emoji in reaction.message.guild.emojis:
+                emoji_usage_dict = await self.bot.open_json_file(reaction.message.guild, "emoji_usage.json", dict())
+                emoji_usage_dict[reaction.emoji.name] = emoji_usage_dict.get(reaction.emoji.name, 0) + 1
+                await self.bot.write_json_file(reaction.message.guild, "emoji_usage.json", emoji_usage_dict)
 
     @commands.Cog.listener(name="on_message")
     async def emoji_usage_counter_message(self, message: discord.Message):
@@ -58,9 +61,10 @@ class EmojiManager(commands.Cog):
             for emoji_string in unique_emoji_strings:
                 emoji = discord.utils.get(message.guild.emojis, name=emoji_string)
                 if emoji:
-                    emoji_usage_dict = await self.bot.open_json_file(message.guild, "emoji_usage.json", dict())
-                    emoji_usage_dict[emoji.name] = emoji_usage_dict.get(emoji.name, 0) + 1
-                    await self.bot.write_json_file(message.guild, "emoji_usage.json", emoji_usage_dict)
+                    async with message_lock:
+                        emoji_usage_dict = await self.bot.open_json_file(message.guild, "emoji_usage.json", dict())
+                        emoji_usage_dict[emoji.name] = emoji_usage_dict.get(emoji.name, 0) + 1
+                        await self.bot.write_json_file(message.guild, "emoji_usage.json", emoji_usage_dict)
 
     @discord.app_commands.command(
         name="emoji_usage",
