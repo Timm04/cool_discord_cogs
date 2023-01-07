@@ -42,7 +42,7 @@ class OpenAIReply(commands.Cog):
         change_prompt_modal = ChangePromptModal(self.bot)
         change_prompt_modal.add_item(
             discord.ui.TextInput(label='New Prompt:', style=discord.TextStyle.paragraph, default=current_prompt,
-                                 min_length=100, max_length=4000))
+                                 min_length=0, max_length=None))
         await interaction.response.send_modal(change_prompt_modal)
 
     @discord.app_commands.command(
