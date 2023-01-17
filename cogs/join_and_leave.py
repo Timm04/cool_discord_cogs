@@ -172,7 +172,7 @@ class JoinAndLeave(commands.Cog):
                 await join_channel.send(message)
 
             if default_role_name:
-                default_role = discord.utils.get(member.roles, name=default_role_name)
+                default_role = discord.utils.get(member.guild.roles, name=default_role_name)
                 if default_role:
                     await member.add_roles(default_role)
 

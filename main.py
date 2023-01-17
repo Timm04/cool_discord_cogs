@@ -9,7 +9,7 @@ import traceback
 
 log = logging.getLogger(__name__)
 testing_mode = False
-testing_cog = "cogs.quiz_cage"
+testing_cog = "cogs.join_and_leave"
 
 class CustomCommandTree(discord.app_commands.CommandTree):
     def __init__(self, bot):
