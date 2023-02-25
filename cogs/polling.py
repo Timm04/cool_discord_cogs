@@ -1,9 +1,58 @@
 """Create polls"""
-import discord
-import os
-from discord.ext import commands
-from discord.ext import tasks
+import asyncio
 
+import discord
+from discord.ext import commands
+
+from . import data_management
+
+#########################################
+
+# Database Operations and Values
+
+SETTINGS_TABLE_NAME = "polling"
+SETTINGS_COLUMNS = ("guild_id", "poll_id", "poll_settings", "votes", "start_date")
+
+
+async def fetch_poll_settings(guild_id: int, poll_id: str):
+    return await data_management.fetch_entry(SETTINGS_TABLE_NAME, SETTINGS_COLUMNS[2], guild_id=guild_id,
+                                             default_type=list, poll_id=poll_id)
+
+
+async def write_poll_settings(guild_id: int, poll_id: str, poll_data: list):
+    await data_management.update_entry(SETTINGS_TABLE_NAME, SETTINGS_COLUMNS[2], poll_data, guild_id=guild_id,
+                                       poll_id=poll_id)
+
+
+async def fetch_poll_votes(guild_id: int, poll_id: str):
+    return await data_management.fetch_entry(SETTINGS_TABLE_NAME, SETTINGS_COLUMNS[3], guild_id=guild_id,
+                                             default_type=dict, poll_id=poll_id)
+
+
+async def write_poll_votes(guild_id: int, poll_id: str, poll_votes: dict):
+    await data_management.update_entry(SETTINGS_TABLE_NAME, SETTINGS_COLUMNS[3], poll_votes, guild_id=guild_id,
+                                       poll_id=poll_id)
+
+
+async def fetch_start_date(guild_id: int, poll_id: str):
+    return await data_management.fetch_entry(SETTINGS_TABLE_NAME, SETTINGS_COLUMNS[4], guild_id=guild_id,
+                                             default_type=str, poll_id=poll_id)
+
+
+async def write_start_date(guild_id: int, poll_id: str, start_date: str):
+    await data_management.update_entry(SETTINGS_TABLE_NAME, SETTINGS_COLUMNS[4], start_date, guild_id=guild_id,
+                                       poll_id=poll_id)
+
+
+async def fetch_poll_id_list(guild_id: int):
+    return await data_management.fetch_entry(SETTINGS_TABLE_NAME, SETTINGS_COLUMNS[1], guild_id=guild_id)
+
+
+async def delete_poll(guild_id: int, poll_id: str):
+    await data_management.delete_entry(SETTINGS_TABLE_NAME, guild_id=guild_id, poll_id=poll_id)
+
+
+#########################################
 
 class Polling(commands.Cog):
 
@@ -11,19 +60,28 @@ class Polling(commands.Cog):
         self.bot = bot
 
     async def cog_load(self):
+        await data_management.create_table(SETTINGS_TABLE_NAME, SETTINGS_COLUMNS)
+
+        loop = asyncio.get_event_loop()
+        loop.create_task(self.load_polls())
+
+    async def load_polls(self):
+        await asyncio.sleep(15)
         for guild in self.bot.guilds:
-            active_polls = await self.bot.open_json_file(guild, "active_polls.json", dict())
-            for poll_id in active_polls:
-                poll_settings = active_polls[poll_id]
+            active_poll_ids = await fetch_poll_id_list(guild.id)
+            if not isinstance(active_poll_ids, list):
+                active_poll_ids = [active_poll_ids]
+            for poll_id in active_poll_ids:
+                poll_settings = await fetch_poll_settings(guild.id, poll_id)
                 poll_view = await create_poll_view(poll_settings)
                 print(f"Loaded poll with ID {poll_id}")
                 self.bot.add_view(poll_view)
 
     async def cog_unload(self):
         for guild in self.bot.guilds:
-            active_polls = await self.bot.open_json_file(guild, "active_polls.json", dict())
-            for poll_id in active_polls:
-                poll_settings = active_polls[poll_id]
+            active_poll_ids = await fetch_poll_id_list(guild.id)
+            for poll_id in active_poll_ids:
+                poll_settings = await fetch_poll_settings(guild.id, poll_id)
                 poll_view = await create_poll_view(poll_settings)
                 poll_view.stop()
 
@@ -38,8 +96,8 @@ class Polling(commands.Cog):
     async def poll(self, interaction: discord.Interaction, poll_name: str, poll_id: str, vote_count: int = 1):
         poll_id = str(interaction.guild.id) + ":" + poll_id
 
-        active_polls = await self.bot.open_json_file(interaction.guild, "active_polls.json", dict())
-        if poll_id in active_polls:
+        active_poll_ids = await fetch_poll_id_list(interaction.guild_id)
+        if poll_id in active_poll_ids:
             await interaction.response.send_message("Poll ID already in use.", ephemeral=True)
             return
 
@@ -266,9 +324,7 @@ async def send_poll_message(interaction, poll_settings):
                                             view=poll_view,
                                             allowed_mentions=discord.AllowedMentions.none())
 
-    active_polls = await interaction.client.open_json_file(interaction.guild, "active_polls.json", dict())
-    active_polls[poll_id] = poll_settings
-    await interaction.client.write_json_file(interaction.guild, "active_polls.json", active_polls)
+    await write_poll_settings(interaction.guild_id, poll_id, poll_settings)
 
 
 # Create poll view
@@ -308,12 +364,12 @@ class PollSelect(discord.ui.Select):
                                                 ephemeral=True)
 
     async def register_votes(self, interaction: discord.Interaction, vote_weight):
-        vote_data = await interaction.client.open_json_file(interaction.guild, f"{self.poll_id}:votes.json", dict())
+        vote_data = await fetch_poll_votes(interaction.guild_id, self.poll_id)
         votes = list(self.values)
         votes.append(vote_weight)
         vote_data[str(interaction.user.id)] = votes
         await self.edit_message(interaction, vote_data)
-        await interaction.client.write_json_file(interaction.guild, f"{self.poll_id}:votes.json", vote_data)
+        await write_poll_votes(interaction.guild_id, self.poll_id, vote_data)
 
     async def edit_message(self, interaction: discord.Interaction, vote_data):
         poll_message = interaction.message
@@ -388,10 +444,12 @@ class PollVoteInfoButton(discord.ui.Button):
                 for line in vote_data_string.splitlines():
                     lines.append(line)
                     if len("\n".join(lines)) > 3000:
-                        await interaction.user.dm_channel.send(embed=discord.Embed(title="Votes", description="\n".join(lines)))
+                        await interaction.user.dm_channel.send(
+                            embed=discord.Embed(title="Votes", description="\n".join(lines)))
                         lines = []
                 if lines:
-                    await interaction.user.dm_channel.send(embed=discord.Embed(title="Votes", description="\n".join(lines)))
+                    await interaction.user.dm_channel.send(
+                        embed=discord.Embed(title="Votes", description="\n".join(lines)))
 
             try:
                 await interaction.response.send_message(vote_data_string, ephemeral=True)
@@ -399,7 +457,7 @@ class PollVoteInfoButton(discord.ui.Button):
                 pass
 
     async def get_user_vote_info(self, interaction: discord.Interaction):
-        vote_data = await interaction.client.open_json_file(interaction.guild, f"{self.poll_id}:votes.json", dict())
+        vote_data = await fetch_poll_votes(interaction.guild_id, self.poll_id)
         user_vote_data = vote_data.get(str(interaction.user.id), None)
         if not user_vote_data:
 
@@ -415,7 +473,7 @@ class PollVoteInfoButton(discord.ui.Button):
         return vote_string, vote_weight
 
     async def get_all_vote_info(self, interaction: discord.Interaction):
-        vote_data = await interaction.client.open_json_file(interaction.guild, f"{self.poll_id}:votes.json", dict())
+        vote_data = await fetch_poll_votes(interaction.guild_id, self.poll_id)
         vote_summary = [f"A total of {len(vote_data)} members voted:\n"]
         for user_id in vote_data:
             member = interaction.guild.get_member(int(user_id))
@@ -462,7 +520,6 @@ class PollEndButton(discord.ui.Button):
 
         return vote_embeds
 
-
     async def callback(self, interaction: discord.Interaction):
         delete_permissions = False
         if interaction.user.id == self.creator_id:
@@ -474,7 +531,7 @@ class PollEndButton(discord.ui.Button):
                                                     ephemeral=True)
             return
 
-        vote_data = await interaction.client.open_json_file(interaction.guild, f"{self.poll_id}:votes.json", dict())
+        vote_data = await fetch_poll_votes(interaction.guild_id, self.poll_id)
         vote_result = dict()
         vote_summary = [f"A total of {len(vote_data)} members voted:\n"]
         for user_id in vote_data:
@@ -500,11 +557,6 @@ class PollEndButton(discord.ui.Button):
 
         vote_embeds = await self.create_vote_embeds(vote_summary)
 
-        # Remove poll from active polls
-        active_polls = await interaction.client.open_json_file(interaction.guild, "active_polls.json", dict())
-        del active_polls[self.poll_id]
-        await interaction.client.write_json_file(interaction.guild, "active_polls.json", active_polls)
-
         # Edit post
         poll_message = interaction.message
         poll_embed = poll_message.embeds[0]
@@ -519,8 +571,7 @@ class PollEndButton(discord.ui.Button):
         # Stop listening to View.
         self.view.stop()
 
-        # Remove votes data
-        try:
-            os.remove(f"data/{interaction.guild.id}/{self.poll_id}:votes.json")
-        except FileNotFoundError:
-            print(f"File data/{interaction.guild.id}/{self.poll_id}:votes.json was not found.")
+        # Delete poll data
+        await delete_poll(interaction.guild_id, poll_id=self.poll_id)
+
+# TODO: Add a function that terminates polls after two weeks

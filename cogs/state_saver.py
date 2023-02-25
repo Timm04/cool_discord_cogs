@@ -1,40 +1,162 @@
 """Save guild roles/channels/permissions and more"""
 import asyncio
 import io
-import discord
 import os
 import pickle
 from datetime import datetime
+
+import discord
 from discord.ext import commands
 from discord.ext import tasks
+
+from . import rank_saver
 
 
 async def snapshot_autocomplete(interaction: discord.Interaction, current_input: str):
     possible_choices = []
-    for guild in interaction.client.guilds:
-        folder_path = f"data/{guild.id}/snapshots/"
-        snapshot_list = os.listdir(folder_path)
-        for snapshot in snapshot_list:
-            full_path = folder_path + snapshot
-            choice = discord.app_commands.Choice(name=snapshot, value=full_path)
-            if current_input in snapshot:
-                possible_choices.append(choice)
+    folder_path = f"snapshots/"
+    snapshot_list = os.listdir(folder_path)
+    for snapshot in snapshot_list:
+        full_path = folder_path + snapshot
+        choice = discord.app_commands.Choice(name=snapshot, value=full_path)
+        if current_input in snapshot:
+            possible_choices.append(choice)
 
     return possible_choices[0:25]
+
+
+async def get_missing_bot_list(guild, guild_snapshot):
+    missing_bots = []
+    for bot_role in guild_snapshot.bot_roles:
+        bot_member = guild.get_member(bot_role.bot_id)
+        if not bot_member:
+            missing_bots.append(f"`{bot_role.name}`")
+
+    return missing_bots
+
+
+async def save_roles(guild, guild_snapshot):
+    for role in guild.roles:
+        if role.is_bot_managed():
+            guild_snapshot.add_bot_role(role.name, role.hoist, role.position, role.colour, role.permissions,
+                                        role.members[0].id)
+        elif role.is_premium_subscriber():
+            if role.display_icon:
+                role_icon = await role.display_icon.read()
+                guild_snapshot.add_premium_role(role.name, role.hoist, role.mentionable, role.position, role.colour,
+                                                role.permissions, role_icon)
+            else:
+                guild_snapshot.add_premium_role(role.name, role.hoist, role.mentionable, role.position, role.colour,
+                                                role.permissions)
+        elif role.is_default():
+            guild_snapshot.add_default_role(role.mentionable, role.permissions)
+
+        elif role.display_icon:
+            role_icon = await role.display_icon.read()
+            guild_snapshot.add_user_role(role.name, role.hoist, role.mentionable, role.position, role.colour,
+                                         role.permissions, role_icon)
+        else:
+            guild_snapshot.add_user_role(role.name, role.hoist, role.mentionable, role.position, role.colour,
+                                         role.permissions)
+
+    return guild_snapshot
+
+
+async def save_channels(guild, guild_snapshot):
+    for channel in guild.channels:
+        if isinstance(channel, discord.TextChannel):
+            if not channel.category:
+                text_channel_snapshot = SnapshotTextChannel(channel.name, channel.topic, channel.nsfw,
+                                                            channel.position,
+                                                            channel.permissions_synced,
+                                                            channel.default_auto_archive_duration)
+            else:
+                text_channel_snapshot = SnapshotTextChannel(channel.name, channel.topic, channel.nsfw,
+                                                            channel.position,
+                                                            channel.permissions_synced,
+                                                            channel.default_auto_archive_duration,
+                                                            channel.category.name)
+            for role in channel.overwrites:
+                if not isinstance(role, discord.Role):
+                    continue
+                overwrite = channel.overwrites[role]
+                text_channel_snapshot.add_overwrite(role.name, overwrite)
+            guild_snapshot.add_text_channel(text_channel_snapshot)
+
+        elif isinstance(channel, discord.VoiceChannel):
+            if not channel.category:
+                voice_channel_snapshot = SnapshotVoiceChannel(channel.name, channel.nsfw, channel.position,
+                                                              channel.permissions_synced)
+            else:
+                voice_channel_snapshot = SnapshotVoiceChannel(channel.name, channel.nsfw, channel.position,
+                                                              channel.permissions_synced, channel.category.name)
+            for role in channel.overwrites:
+                if not isinstance(role, discord.Role):
+                    continue
+                overwrite = channel.overwrites[role]
+                voice_channel_snapshot.add_overwrite(role.name, overwrite)
+            guild_snapshot.add_voice_channel(voice_channel_snapshot)
+
+        elif isinstance(channel, discord.CategoryChannel):
+            category_snapshot = SnapshotCategoryChannel(channel.name, channel.nsfw, channel.position)
+            for role in channel.overwrites:
+                if not isinstance(role, discord.Role):
+                    continue
+                overwrite = channel.overwrites[role]
+                category_snapshot.add_overwrite(role.name, overwrite)
+            guild_snapshot.add_category(category_snapshot)
+
+    return guild_snapshot
+
+
+async def save_threads(guild, guild_snapshot):
+    for thread in guild.threads:
+        if isinstance(thread.parent, discord.TextChannel):
+            thread_snapshot = SnapshotThread(name=thread.name,
+                                             auto_archive_duration=thread.auto_archive_duration,
+                                             channel_name=thread.parent.name)
+            guild_snapshot.add_thread(thread_snapshot)
+
+    return guild_snapshot
+
+
+async def save_pins(guild, guild_snapshot):
+    for channel in guild.text_channels:
+        await asyncio.sleep(1)
+        pins = await channel.pins()
+        for pin in pins:
+            if pin.author.bot:
+                continue
+            file_list = [(await attachment.read(), attachment.filename) for attachment in pin.attachments if
+                         attachment.size < 8000000]
+            snapshot_pin = PinnedMessage(author=str(pin.author), date=str(pin.created_at)[:10],
+                                         channel_name=pin.channel.name, content=pin.content,
+                                         files=file_list)
+
+            guild_snapshot.add_pin(snapshot_pin)
+
+    return guild_snapshot
+
+
+async def create_snapshot(guild: discord.Guild):
+    guild_snapshot = SnapshotGuild()
+    guild_snapshot = await save_roles(guild, guild_snapshot)
+    guild_snapshot = await save_channels(guild, guild_snapshot)
+    guild_snapshot = await save_threads(guild, guild_snapshot)
+    guild_snapshot = await save_pins(guild, guild_snapshot)
+
+    date_string = str(datetime.utcnow())[:10]
+    guild_name = guild.name.lower().replace(" ", "_")
+    with open(f"snapshots/{date_string}_{guild_name}_snapshot", "wb") as file:
+        pickle.dump(guild_snapshot, file)
+
+    return guild_snapshot
 
 
 class StateSaver(commands.Cog):
 
     def __init__(self, bot):
         self.bot = bot
-        self.create_folders()
-
-    def create_folders(self):
-        for guild in self.bot.guilds:
-            if os.path.isdir(f"data/{guild.id}/snapshots"):
-                continue
-            else:
-                os.mkdir(f"data/{guild.id}/snapshots")
 
     async def cog_load(self):
         self.snapshot_loop.start()
@@ -50,23 +172,9 @@ class StateSaver(commands.Cog):
     async def save_snapshot(self, interaction: discord.Interaction):
         await interaction.response.defer()
 
-        await self.create_snapshot(interaction.guild)
+        await create_snapshot(interaction.guild)
 
         await interaction.edit_original_response(content="Saved snapshot!")
-
-    async def create_snapshot(self, guild: discord.Guild):
-        guild_snapshot = SnapshotGuild()
-        guild_snapshot = await self.save_roles(guild, guild_snapshot)
-        guild_snapshot = await self.save_channels(guild, guild_snapshot)
-        guild_snapshot = await self.save_threads(guild, guild_snapshot)
-        guild_snapshot = await self.save_pins(guild, guild_snapshot)
-
-        date_string = str(datetime.utcnow())[:10]
-        guild_name = guild.name.lower().replace(" ", "_")
-        with open(f"data/{guild.id}/snapshots/{date_string}_{guild_name}_snapshot", "wb") as file:
-            pickle.dump(guild_snapshot, file)
-
-        return guild_snapshot
 
     @discord.app_commands.command(
         name="_load_snapshot",
@@ -87,130 +195,24 @@ class StateSaver(commands.Cog):
                                         description=f"**Channels**: {channel_mentions}\n\n"
                                                     f"**Roles** {role_mentions}")
 
-        missing_bots = await self.get_missing_bot_list(interaction.guild, guild_snapshot)
+        missing_bots = await get_missing_bot_list(interaction.guild, guild_snapshot)
 
         await interaction.response.send_message(f"Are you sure you want to load the snapshot?\n"
-                                                f"The following bots seem to be missing and permissions will not be restored for them: "
+                                                f"The following bots seem to be missing and permissions will not be "
+                                                f"restored for them:"
                                                 f"{', '.join(missing_bots)}\n"
                                                 f"**THIS WILL DELETE ALL ROLES AND CHANNELS.**", embed=to_delete_embed,
                                                 view=button_view, ephemeral=True)
-
-    async def get_missing_bot_list(self, guild, guild_snapshot):
-        missing_bots = []
-        for bot_role in guild_snapshot.bot_roles:
-            bot_member = guild.get_member(bot_role.bot_id)
-            if not bot_member:
-                missing_bots.append(f"`{bot_role.name}`")
-
-        return missing_bots
-
-    async def save_roles(self, guild, guild_snapshot):
-        for role in guild.roles:
-            if role.is_bot_managed():
-                guild_snapshot.add_bot_role(role.name, role.hoist, role.position, role.colour, role.permissions,
-                                            role.members[0].id)
-            elif role.is_premium_subscriber():
-                if role.display_icon:
-                    role_icon = await role.display_icon.read()
-                    guild_snapshot.add_premium_role(role.name, role.hoist, role.mentionable, role.position, role.colour,
-                                                    role.permissions, role_icon)
-                else:
-                    guild_snapshot.add_premium_role(role.name, role.hoist, role.mentionable, role.position, role.colour,
-                                                    role.permissions)
-            elif role.is_default():
-                guild_snapshot.add_default_role(role.mentionable, role.permissions)
-
-            elif role.display_icon:
-                role_icon = await role.display_icon.read()
-                guild_snapshot.add_user_role(role.name, role.hoist, role.mentionable, role.position, role.colour,
-                                             role.permissions, role_icon)
-            else:
-                guild_snapshot.add_user_role(role.name, role.hoist, role.mentionable, role.position, role.colour,
-                                             role.permissions)
-
-        return guild_snapshot
-
-    async def save_channels(self, guild, guild_snapshot):
-        for channel in guild.channels:
-            if isinstance(channel, discord.TextChannel):
-                if not channel.category:
-                    text_channel_snapshot = SnapshotTextChannel(channel.name, channel.topic, channel.nsfw,
-                                                                channel.position,
-                                                                channel.permissions_synced,
-                                                                channel.default_auto_archive_duration)
-                else:
-                    text_channel_snapshot = SnapshotTextChannel(channel.name, channel.topic, channel.nsfw,
-                                                                channel.position,
-                                                                channel.permissions_synced,
-                                                                channel.default_auto_archive_duration,
-                                                                channel.category.name)
-                for role in channel.overwrites:
-                    if not isinstance(role, discord.Role):
-                        continue
-                    overwrite = channel.overwrites[role]
-                    text_channel_snapshot.add_overwrite(role.name, overwrite)
-                guild_snapshot.add_text_channel(text_channel_snapshot)
-
-            elif isinstance(channel, discord.VoiceChannel):
-                if not channel.category:
-                    voice_channel_snapshot = SnapshotVoiceChannel(channel.name, channel.nsfw, channel.position,
-                                                                  channel.permissions_synced)
-                else:
-                    voice_channel_snapshot = SnapshotVoiceChannel(channel.name, channel.nsfw, channel.position,
-                                                                  channel.permissions_synced, channel.category.name)
-                for role in channel.overwrites:
-                    if not isinstance(role, discord.Role):
-                        continue
-                    overwrite = channel.overwrites[role]
-                    voice_channel_snapshot.add_overwrite(role.name, overwrite)
-                guild_snapshot.add_voice_channel(voice_channel_snapshot)
-
-            elif isinstance(channel, discord.CategoryChannel):
-                category_snapshot = SnapshotCategoryChannel(channel.name, channel.nsfw, channel.position)
-                for role in channel.overwrites:
-                    if not isinstance(role, discord.Role):
-                        continue
-                    overwrite = channel.overwrites[role]
-                    category_snapshot.add_overwrite(role.name, overwrite)
-                guild_snapshot.add_category(category_snapshot)
-
-        return guild_snapshot
-
-    async def save_threads(self, guild, guild_snapshot):
-        for thread in guild.threads:
-            if isinstance(thread.parent, discord.TextChannel):
-                thread_snapshot = SnapshotThread(name=thread.name,
-                                                 auto_archive_duration=thread.auto_archive_duration,
-                                                 channel_name=thread.parent.name)
-                guild_snapshot.add_thread(thread_snapshot)
-
-        return guild_snapshot
-
-    async def save_pins(self, guild, guild_snapshopt):
-        for channel in guild.text_channels:
-            await asyncio.sleep(1)
-            pins = await channel.pins()
-            for pin in pins:
-                if pin.author.bot:
-                    continue
-                file_list = [(await attachment.read(), attachment.filename) for attachment in pin.attachments if
-                             attachment.size < 8000000]
-                snapshot_pin = PinnedMessage(author=str(pin.author), date=str(pin.created_at)[:10],
-                                             channel_name=pin.channel.name, content=pin.content,
-                                             files=file_list)
-
-                guild_snapshopt.add_pin(snapshot_pin)
-
-        return guild_snapshopt
 
     @discord.app_commands.command(
         name="_restore_roles",
         description="Manually start the role restorer for the current members.")
     @discord.app_commands.guild_only()
     @discord.app_commands.default_permissions(administrator=True)
-    async def restore_roles(self, interaction: discord.Interaction):
+    async def restore_roles(self, interaction: discord.Interaction, guild_id: str):
         await interaction.response.send_message("Restoring roles.")
-        user_roles_dictionary = await self.bot.open_json_file(interaction.guild, "rank_saver.json", dict())
+        guild_id = int(guild_id)
+        user_roles_dictionary = await rank_saver.fetch_rank_data(guild_id)
         for user_id in user_roles_dictionary:
             member = interaction.guild.get_member(int(user_id))
             if not member:
@@ -234,7 +236,9 @@ class StateSaver(commands.Cog):
         await asyncio.sleep(6000)
         for guild in self.bot.guilds:
             print(f"Creating snapshot for {guild.name}.")
-            await self.create_snapshot(guild)
+            await create_snapshot(guild)
+
+        # TODO: Add function to remove old snapshots
 
 
 async def setup(bot):
@@ -397,6 +401,40 @@ class PinnedMessage:
         self.files = files
 
 
+async def verify_if_top_role(guild, bot):
+    top_role = None
+    for role in guild.roles:
+        if not top_role:
+            top_role = role
+        if top_role < role:
+            top_role = role
+
+    bot_member = guild.get_member(bot.user.id)
+    if top_role not in bot_member.roles:
+        return False
+    else:
+        for role in bot_member.roles:
+            if role.is_bot_managed():
+                return role
+
+
+async def delete_all_channels(guild: discord.Guild):
+    for channel in guild.channels:
+        await asyncio.sleep(1)
+        print(f"Deleting channel: {channel.name}")
+        await channel.delete()
+
+
+async def delete_roles(guild: discord.Guild):
+    for role in guild.roles:
+        try:
+            await asyncio.sleep(1)
+            print(f"Deleting role: {role.name}")
+            await role.delete(reason="Restoration.")
+        except discord.errors.HTTPException:
+            print(f"Failed to delete role: {role.name}")
+
+
 class ConfirmDeletionButton(discord.ui.Button):
     def __init__(self, bot, guild_snapshot):
         super().__init__(label="I am sure.", style=discord.ButtonStyle.danger)
@@ -411,11 +449,11 @@ class ConfirmDeletionButton(discord.ui.Button):
         if not bot_role:
             return
 
-        await self.delete_roles(interaction.guild)
+        await delete_roles(interaction.guild)
         await self.edit_default_role(interaction.guild)
         await self.edit_premium_role(interaction.guild)
         await self.create_roles_and_positions(interaction.guild, bot_role)
-        await self.delete_all_channels(interaction.guild)
+        await delete_all_channels(interaction.guild)
         await self.create_categories(interaction.guild)
         await self.create_text_channels(interaction.guild)
         await self.create_voice_channels(interaction.guild)
@@ -425,7 +463,7 @@ class ConfirmDeletionButton(discord.ui.Button):
         await interaction.guild.text_channels[0].send("Finished creating guild.")
 
     async def verify_permissions(self, interaction):
-        bot_role = await self.verify_if_top_role(interaction.guild, self.bot)
+        bot_role = await verify_if_top_role(interaction.guild, self.bot)
         if not bot_role:
             await interaction.edit_original_response(content="Bot does not have top role.\n"
                                                              "Please ensure that it does before loading a snapshot.")
@@ -437,28 +475,6 @@ class ConfirmDeletionButton(discord.ui.Button):
             return False
 
         return bot_role
-
-    async def verify_if_top_role(self, guild, bot):
-        top_role = None
-        for role in guild.roles:
-            if not top_role:
-                top_role = role
-            if top_role < role:
-                top_role = role
-
-        bot_member = guild.get_member(bot.user.id)
-        if top_role not in bot_member.roles:
-            return False
-        else:
-            for role in bot_member.roles:
-                if role.is_bot_managed():
-                    return role
-
-    async def delete_all_channels(self, guild: discord.Guild):
-        for channel in guild.channels:
-            await asyncio.sleep(1)
-            print(f"Deleting channel: {channel.name}")
-            await channel.delete()
 
     async def create_categories(self, guild: discord.Guild):
         for category_data in self.guild_snapshot.categories:
@@ -543,15 +559,6 @@ class ConfirmDeletionButton(discord.ui.Button):
                                 colour=bot_role_data.colour, permissions=bot_role_data.permissions)
 
             self.role_positions[bot_role] = bot_role_data.position
-
-    async def delete_roles(self, guild: discord.Guild):
-        for role in guild.roles:
-            try:
-                await asyncio.sleep(1)
-                print(f"Deleting role: {role.name}")
-                await role.delete(reason="Restoration.")
-            except discord.errors.HTTPException:
-                print(f"Failed to delete role: {role.name}")
 
     async def create_roles_and_positions(self, guild, bot_role):
         for role in self.guild_snapshot.user_roles:

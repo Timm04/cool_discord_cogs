@@ -1,11 +1,29 @@
 """Cog providing some basic moderator tools"""
-import asyncio
+from datetime import datetime
 
 import discord
 from discord.ext import commands
-from discord.ext import tasks
-from datetime import datetime
-from datetime import timedelta
+
+from . import data_management
+
+#########################################
+
+# Database Operations and Values
+
+SETTINGS_TABLE_NAME = "moderation_settings"
+SETTINGS_COLUMNS = ("guild_id", "moderator_log_channel")
+
+
+async def fetch_moderator_channel(guild_id: int):
+    return await data_management.fetch_entry(SETTINGS_TABLE_NAME, SETTINGS_COLUMNS[1], guild_id=guild_id)
+
+
+async def write_moderator_channel(guild_id: int, moderator_channel: discord.TextChannel):
+    await data_management.update_entry(SETTINGS_TABLE_NAME, SETTINGS_COLUMNS[1], moderator_channel.name,
+                                       guild_id=guild_id)
+
+
+#########################################
 
 
 class ModerationModal(discord.ui.Modal):
@@ -18,7 +36,7 @@ class ModerationModal(discord.ui.Modal):
 
     async def on_submit(self, interaction: discord.Interaction):
         await interaction.response.defer(thinking=True)
-        log_channel_name = await self.bot.open_json_file(interaction.guild, "moderator_channel.json", str())
+        log_channel_name = await fetch_moderator_channel(interaction.guild_id)
         log_channel = discord.utils.get(interaction.guild.channels, name=log_channel_name)
         if not log_channel:
             raise ValueError("Not able to find moderation log channel.")
@@ -68,37 +86,9 @@ class ModerationModal(discord.ui.Modal):
                                        value=f"`{messages_content}`\n[...]",
                                        inline=False)
 
-        elif self.action_function_name == "timeout_user":
-            performed_action = await self.timeout_member()
-            if not performed_action:
-                await interaction.edit_original_response(content=
-                                                         f"You cannot perform this action on that user, {interaction.user.display_name}!")
-                return
-            hours = performed_action[1]
-            report_embed.add_field(name=f"Timeout for {hours} hours",
-                                   value=f"**Member**: {self.target_object.mention}"
-                                         f"\n**Name**: `{str(self.target_object)}`"
-                                         f"\n**Author ID**: `{self.target_object.id}`"
-                                         f"\n**Reason**: `{reason}`")
-            await interaction.channel.send(embed=report_embed)
-
-        elif self.action_function_name == "kick_user":
-            performed_action = await self.kick_user()
-            if not performed_action:
-                await interaction.edit_original_response(content=
-                                                         f"You cannot perform this action on that user, {interaction.user.display_name}!")
-                return
-            report_embed.add_field(name=f"Kick",
-                                   value=f"**Member**: {self.target_object.mention}"
-                                         f"\n**Name**: `{str(self.target_object)}`"
-                                         f"\n**Author ID**: `{self.target_object.id}`"
-                                         f"\n**Reason**: `{reason}`")
-            print(report_embed)
-            await interaction.channel.send(embed=report_embed)
-
         elif self.action_function_name == "toggle_pin":
             try:
-                pin_action = await self.toggle_ping()
+                pin_action = await self.toggle_pinned()
             except discord.errors.HTTPException:
                 await interaction.edit_original_response(
                     content=f"Message seems to have been deleted., {interaction.user.display_name}!")
@@ -114,7 +104,6 @@ class ModerationModal(discord.ui.Modal):
 
             await interaction.channel.send(embed=report_embed)
 
-        await asyncio.sleep(5)
         await log_channel.send(embed=report_embed)
         await interaction.edit_original_response(
             content=f"Thank you for your hard work, {interaction.user.display_name}!")
@@ -125,7 +114,7 @@ class ModerationModal(discord.ui.Modal):
             if self.target_object.author.guild_permissions.administrator:
                 return False
         except AttributeError:
-            return True
+            pass
         await self.target_object.delete()
         return True
 
@@ -142,7 +131,7 @@ class ModerationModal(discord.ui.Modal):
             if member_to_purge.guild_permissions.administrator:
                 return False
         except AttributeError:
-            return False
+            pass
 
         count = 1
 
@@ -167,37 +156,7 @@ class ModerationModal(discord.ui.Modal):
         await self.target_object.delete()
         return True, "\n".join(messages_content_list)[0:1000]
 
-    async def timeout_member(self):
-        self.target_object: discord.Member
-        try:
-            hours = int(self.children[1].value)
-        except ValueError:
-            hours = 0
-
-        if self.target_object.guild_permissions:
-            if self.target_object.guild_permissions.administrator:
-                return False
-
-        hours_to_timeout = timedelta(hours=hours)
-        await self.target_object.timeout(hours_to_timeout, reason=self.children[0].value)
-        return True, hours
-
-    async def kick_user(self):
-        self.target_object: discord.Member
-        if self.target_object.guild_permissions.administrator:
-            return False
-
-        await self.target_object.create_dm()
-        dm_channel = self.target_object.dm_channel
-        try:
-            await dm_channel.send(f"You got kicked from {self.target_object.guild.name} "
-                                  f"for the following reason:\n`{self.children[0].value}`")
-        except discord.errors.Forbidden:
-            pass
-        await self.target_object.kick(reason=self.children[0].value)
-        return True
-
-    async def toggle_ping(self):
+    async def toggle_pinned(self):
         self.target_object: discord.Message
         if self.target_object.pinned:
             await self.target_object.unpin(reason=self.children[0].value)
@@ -216,10 +175,6 @@ class Moderation(commands.Cog):
                                                                 callback=self.delete_message)
         self.purge_ctx_menu = discord.app_commands.ContextMenu(name="Purge messages",
                                                                callback=self.purge_messages)
-        self.timeout_ctx_menu = discord.app_commands.ContextMenu(name="Timeout user",
-                                                                 callback=self.timeout_user)
-        self.kick_ctx_menu = discord.app_commands.ContextMenu(name="Kick user",
-                                                              callback=self.kick_user)
         self.pin_ctx_menu = discord.app_commands.ContextMenu(name="Toggle pin",
                                                              callback=self.toggle_pin)
 
@@ -230,15 +185,13 @@ class Moderation(commands.Cog):
     @discord.app_commands.describe(mod_channel="The channel to which moderation reports get sent.")
     @discord.app_commands.default_permissions(administrator=True)
     async def set_mod_channel(self, interaction: discord.Interaction, mod_channel: discord.TextChannel):
-        mod_channel_name = mod_channel.name
-        await self.bot.write_json_file(interaction.guild, "moderator_channel.json", mod_channel_name)
+        await write_moderator_channel(interaction.guild_id, mod_channel)
         await interaction.response.send_message(f"Set moderator channel to {mod_channel.mention}.")
 
     async def cog_load(self):
+        await data_management.create_table(SETTINGS_TABLE_NAME, SETTINGS_COLUMNS)
         self.bot.tree.add_command(self.delete_ctx_menu)
         self.bot.tree.add_command(self.purge_ctx_menu)
-        self.bot.tree.add_command(self.timeout_ctx_menu)
-        self.bot.tree.add_command(self.kick_ctx_menu)
         self.bot.tree.add_command(self.pin_ctx_menu)
 
     @discord.app_commands.default_permissions(administrator=True)
@@ -257,20 +210,6 @@ class Moderation(commands.Cog):
                                                                    "weeks."))
         moderation_modal.add_item(discord.ui.TextInput(label='Message Count', min_length=1, max_length=2,
                                                        default="20"))
-        await interaction.response.send_modal(moderation_modal)
-
-    @discord.app_commands.default_permissions(administrator=True)
-    async def timeout_user(self, interaction: discord.Interaction, member: discord.Member):
-        moderation_modal = ModerationModal(interaction.command.name, member, self.bot)
-        moderation_modal.add_item(discord.ui.TextInput(label='Reason for timeout', min_length=4, max_length=400))
-        moderation_modal.add_item(discord.ui.TextInput(label='How many hours to timeout', min_length=1, max_length=2,
-                                                       default="1"))
-        await interaction.response.send_modal(moderation_modal)
-
-    @discord.app_commands.default_permissions(administrator=True)
-    async def kick_user(self, interaction: discord.Interaction, member: discord.Member):
-        moderation_modal = ModerationModal(interaction.command.name, member, self.bot)
-        moderation_modal.add_item(discord.ui.TextInput(label='Reason for kick', min_length=4, max_length=400))
         await interaction.response.send_modal(moderation_modal)
 
     @discord.app_commands.default_permissions(administrator=True)

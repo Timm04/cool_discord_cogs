@@ -1,8 +1,9 @@
 /data/
-/goals.txt
-/.old/
-/.idea/
-/scripts/
+/main.py
+/cogs/config/
+/snapshots/
 /backup/
-/experimental/
-/cogs/misc.py
+/venv/
+/ansible/
+/.rsync-filter
+/.idea/

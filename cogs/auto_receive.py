@@ -1,12 +1,43 @@
-"""Automatically receive roles."""
+"""Cog that enables certain roles to automatically receive other roles."""
 import asyncio
 
 import discord
 from discord.ext import commands
 from discord.ext import tasks
 
-async def autocomplete_autoreceive(interaction: discord.Interaction, current_input: str):
-    auto_receive_data = await interaction.client.open_json_file(interaction.guild, "auto_receive_roles.json", list())
+from . import data_management
+
+#########################################
+
+# Database Operations and Values
+
+SETTINGS_TABLE_NAME = "auto_receive_roles_settings"
+SETTINGS_COLUMNS = ("guild_id", "auto_receive_roles", "auto_receive_banned")
+
+
+async def fetch_auto_receive_role_data(guild_id: int):
+    return await data_management.fetch_entry(SETTINGS_TABLE_NAME, SETTINGS_COLUMNS[1], guild_id=guild_id)
+
+
+async def fetch_auto_receive_banned_data(guild_id: int):
+    return await data_management.fetch_entry(SETTINGS_TABLE_NAME, SETTINGS_COLUMNS[2], guild_id=guild_id)
+
+
+async def write_auto_receive_role_data(guild_id: int, auto_receive_role_data: list):
+    await data_management.update_entry(SETTINGS_TABLE_NAME, SETTINGS_COLUMNS[1], auto_receive_role_data,
+                                       guild_id=guild_id)
+
+
+async def write_auto_receive_banned_data(guild_id: int, auto_receive_banned_data: list):
+    await data_management.update_entry(SETTINGS_TABLE_NAME, SETTINGS_COLUMNS[2], auto_receive_banned_data,
+                                       guild_id=guild_id)
+
+
+#########################################
+
+
+async def autocomplete_auto_receive(interaction: discord.Interaction, current_input: str):
+    auto_receive_data = await fetch_auto_receive_role_data(interaction.guild_id)
     possible_options = []
     for role_to_have, role_to_get in auto_receive_data:
         if current_input in role_to_have or current_input in role_to_get:
@@ -15,12 +46,16 @@ async def autocomplete_autoreceive(interaction: discord.Interaction, current_inp
 
     return possible_options[0:25]
 
+
+#########################################
+
 class AutoReceive(commands.Cog):
 
     def __init__(self, bot):
         self.bot = bot
 
     async def cog_load(self):
+        await data_management.create_table(SETTINGS_TABLE_NAME, SETTINGS_COLUMNS)
         self.give_auto_roles.start()
 
     async def cog_unload(self):
@@ -35,53 +70,68 @@ class AutoReceive(commands.Cog):
     @discord.app_commands.default_permissions(administrator=True)
     async def set_role_auto_receive(self, interaction: discord.Interaction, role_to_have: discord.Role,
                                     role_to_get: discord.Role):
-        auto_receive_data = await self.bot.open_json_file(interaction.guild, "auto_receive_roles.json", list())
+        auto_receive_data = await fetch_auto_receive_role_data(interaction.guild_id)
         auto_receive_data.append((role_to_have.name, role_to_get.name))
-        await self.bot.write_json_file(interaction.guild, "auto_receive_roles.json", auto_receive_data)
-        await interaction.response.send_message(f"Added `{role_to_have.name} -> {role_to_get.name}` auto receive.")
+        await write_auto_receive_role_data(interaction.guild_id, auto_receive_data)
+        await interaction.response.send_message(f"Added `{role_to_have.name} -> {role_to_get.name}` auto receive.",
+                                                ephemeral=True)
 
     @discord.app_commands.command(
         name="_remove_auto_receive",
         description="Remove a role auto receive setting.")
     @discord.app_commands.guild_only()
-    @discord.app_commands.autocomplete(receive_string=autocomplete_autoreceive)
+    @discord.app_commands.autocomplete(receive_string=autocomplete_auto_receive)
     @discord.app_commands.describe(receive_string="Which receive data should be removed.")
     @discord.app_commands.default_permissions(administrator=True)
     async def remove_auto_receive(self, interaction: discord.Interaction, receive_string: str):
-        auto_receive_data = await self.bot.open_json_file(interaction.guild, "auto_receive_roles.json", list())
+        auto_receive_data = await fetch_auto_receive_role_data(interaction.guild_id)
         role_to_have_name, role_to_receive_name = receive_string.split("+")
         auto_receive_data.remove([role_to_have_name, role_to_receive_name])
-        await self.bot.write_json_file(interaction.guild, "auto_receive_roles.json", auto_receive_data)
-        await interaction.response.send_message(f"Removed the `{role_to_have_name} -> {role_to_receive_name}` assign.")
+        await write_auto_receive_role_data(interaction.guild_id, auto_receive_data)
+        await interaction.response.send_message(f"Removed the `{role_to_have_name} -> {role_to_receive_name}` assign.",
+                                                ephemeral=True)
 
     @discord.app_commands.command(
-        name="_ban_auto_receive",
+        name="_toggle_auto_receive_ban",
         description="Ban a member from automatically receiving roles.")
     @discord.app_commands.guild_only()
     @discord.app_commands.describe(member="The member that should be banned.",
                                    role="The role that should no longer be given.")
     @discord.app_commands.default_permissions(administrator=True)
-    async def ban_auto_receive(self, interaction: discord.Interaction, member: discord.Member,
-                                  role: discord.Role):
+    async def toggle_auto_receive_ban(self, interaction: discord.Interaction, member: discord.Member,
+                                      role: discord.Role):
         if role in member.roles:
             await member.remove_roles(role)
 
-        banned_user_data = await self.bot.open_json_file(interaction.guild, "auto_receive_banned_data.json", list())
-        banned_user_data.append([member.id, role.name])
-        await self.bot.write_json_file(interaction.guild, "auto_receive_banned_data.json", banned_user_data)
-        await interaction.response.send_message(f"Banned {member} from automatically getting the role {role.name}.")
+        banned_user_data = await fetch_auto_receive_banned_data(interaction.guild_id)
+        action = None
+        for banned_user in banned_user_data:
+            banned_user_id, banned_role_name = banned_user
+            if banned_user_id == member.id and banned_role_name == role.name:
+                banned_user_data.remove(banned_user)
+                action = "Unbanned"
+        if not action:
+            banned_user_data.append([member.id, role.name])
+            action = "Banned"
+
+        await write_auto_receive_banned_data(interaction.guild_id, banned_user_data)
+        await interaction.response.send_message(f"{action} {member} from automatically getting the role {role.name}.",
+                                                ephemeral=True)
 
     @tasks.loop(minutes=10)
     async def give_auto_roles(self):
-        await asyncio.sleep(400)
+        await asyncio.sleep(600)
         for guild in self.bot.guilds:
-            auto_receive_data = await self.bot.open_json_file(guild, "auto_receive_roles.json", list())
-            banned_user_data = await self.bot.open_json_file(guild, "auto_receive_banned_data.json", list())
-            for role_to_have_name, role_to_receive_name in auto_receive_data:
+            auto_receive_data = await fetch_auto_receive_role_data(guild.id)
+            banned_user_data = await fetch_auto_receive_banned_data(guild.id)
+            for role_data in auto_receive_data:
+                role_to_have_name, role_to_receive_name = role_data
                 role_to_have = discord.utils.get(guild.roles, name=role_to_have_name)
                 role_to_receive = discord.utils.get(guild.roles, name=role_to_receive_name)
                 if not role_to_have or not role_to_receive:
-                    raise ValueError("Role to receive or role to have not found.")
+                    auto_receive_data.remove(role_data)
+                    await write_auto_receive_role_data(guild.id, auto_receive_data)
+                    continue
                 for member in role_to_have.members:
 
                     banned = False
@@ -90,8 +140,9 @@ class AutoReceive(commands.Cog):
                             banned = True
 
                     if role_to_receive not in member.roles and not banned:
-                        print(f"Gave {member} the role {role_to_receive}")
+                        print(f"AUTO-RECEIVE: Gave {member} the role {role_to_receive} in guild {guild.id}")
                         await member.add_roles(role_to_receive)
+
 
 async def setup(bot):
     await bot.add_cog(AutoReceive(bot))

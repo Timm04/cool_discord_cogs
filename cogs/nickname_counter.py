@@ -1,12 +1,32 @@
 """Create a nickname that counts days"""
 import asyncio
+from datetime import datetime
 
 import discord
 from discord.ext import commands
 from discord.ext import tasks
-from datetime import datetime
-from datetime import timedelta
 
+from . import data_management
+
+#########################################
+
+# Database Operations and Values
+
+SETTINGS_TABLE_NAME = "nickname_counter"
+SETTINGS_COLUMNS = ("guild_id", "nickname_data")
+
+
+async def fetch_nickname_data(guild_id: int):
+    return await data_management.fetch_entry(SETTINGS_TABLE_NAME, SETTINGS_COLUMNS[1], guild_id=guild_id,
+                                             default_type=dict)
+
+
+async def write_nickname_data(guild_id: int, nickname_data: dict):
+    await data_management.update_entry(SETTINGS_TABLE_NAME, SETTINGS_COLUMNS[1], nickname_data,
+                                       guild_id=guild_id)
+
+
+#########################################
 
 class NicknameCounter(commands.Cog):
 
@@ -14,6 +34,7 @@ class NicknameCounter(commands.Cog):
         self.bot = bot
 
     async def cog_load(self):
+        await data_management.create_table(SETTINGS_TABLE_NAME, SETTINGS_COLUMNS)
         self.update_nicknames.start()
 
     async def cog_unload(self):
@@ -30,10 +51,12 @@ class NicknameCounter(commands.Cog):
                                    starting_number="What number the counter should start at.",
                                    nickname="Your new nickname. Include XXXX as placeholder.")
     @discord.app_commands.default_permissions(send_messages=True)
-    async def nickname_counter(self, interaction: discord.Interaction, count_up_or_down: str, starting_number: int, nickname: str):
+    async def nickname_counter(self, interaction: discord.Interaction, count_up_or_down: str, starting_number: int,
+                               nickname: str):
         await interaction.response.defer()
         if "XXXX" not in nickname:
-            await interaction.edit_original_response(content="You have to include `XXXX` in your nickname as a placeholder.")
+            await interaction.edit_original_response(
+                content="You have to include `XXXX` in your nickname as a placeholder.")
             return
 
         if len(nickname) > 32:
@@ -43,9 +66,9 @@ class NicknameCounter(commands.Cog):
         current_date_string = datetime.utcnow().strftime("%Y-%m-%d")
 
         nickname_data = (nickname, count_up_or_down, starting_number, current_date_string)
-        user_nickname_data = await self.bot.open_json_file(interaction.guild, "counting_nickname_data.json", dict())
+        user_nickname_data = await fetch_nickname_data(interaction.guild_id)
         user_nickname_data[str(interaction.user.id)] = nickname_data
-        await self.bot.write_json_file(interaction.guild, "counting_nickname_data.json", user_nickname_data)
+        await write_nickname_data(interaction.guild_id, user_nickname_data)
 
         await self.update_user_nickname(interaction.user, nickname_data)
         await interaction.edit_original_response(content="Changed your nickname!")
@@ -75,11 +98,11 @@ class NicknameCounter(commands.Cog):
     @discord.app_commands.guild_only()
     @discord.app_commands.default_permissions(send_messages=True)
     async def delete_nickname_counter(self, interaction: discord.Interaction):
-        user_nickname_data = await self.bot.open_json_file(interaction.guild, "counting_nickname_data.json", dict())
+        user_nickname_data = await fetch_nickname_data(interaction.guild_id)
         if str(interaction.user.id) in user_nickname_data:
             del user_nickname_data[str(interaction.user.id)]
             await interaction.user.edit(nick=None)
-            await self.bot.write_json_file(interaction.guild, "counting_nickname_data.json", user_nickname_data)
+            await write_nickname_data(interaction.guild_id, user_nickname_data)
             await interaction.response.send_message("Cleared your nickname data.")
         else:
             await interaction.response.send_message("Couldn't find you in the data.")
@@ -88,7 +111,7 @@ class NicknameCounter(commands.Cog):
     async def update_nicknames(self):
         await asyncio.sleep(600)
         for guild in self.bot.guilds:
-            user_nickname_data = await self.bot.open_json_file(guild, "counting_nickname_data.json", dict())
+            user_nickname_data = await fetch_nickname_data(guild.id)
             for user_id in user_nickname_data:
                 member = guild.get_member(int(user_id))
                 if not member:

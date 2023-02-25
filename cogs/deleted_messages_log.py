@@ -1,11 +1,48 @@
-"""Save deleted messages."""
+"""Saves deleted messages to a specified channel and clears the channel after a certain period of time."""
 import asyncio
 from datetime import datetime
 from datetime import timedelta
+
 import discord
 from discord.ext import commands
 from discord.ext import tasks
 
+from . import data_management
+
+#########################################
+
+# Database Operations and Values
+
+SETTINGS_TABLE_NAME = "deleted_messages_settings"
+SETTINGS_COLUMNS = ("guild_id", "settings")
+
+
+async def fetch_settings(guild_id: int):
+    return await data_management.fetch_entry(SETTINGS_TABLE_NAME, SETTINGS_COLUMNS[1], guild_id=guild_id,
+                                             default_type=tuple)
+
+
+async def write_settings(guild_id: int, settings_set: tuple):
+    await data_management.update_entry(SETTINGS_TABLE_NAME, SETTINGS_COLUMNS[1], settings_set, guild_id=guild_id)
+
+
+#########################################
+
+async def retrieve_attachments(message: discord.Message):
+    if message.attachments:
+        files = list()
+        for attachment in message.attachments:
+            try:
+                image_file = await attachment.to_file(use_cached=True)
+                files.append(image_file)
+            except discord.errors.HTTPException:
+                return None
+        return files
+    else:
+        return None
+
+
+#########################################
 
 class DeletedMessagesLog(commands.Cog):
 
@@ -13,6 +50,7 @@ class DeletedMessagesLog(commands.Cog):
         self.bot = bot
 
     async def cog_load(self):
+        await data_management.create_table(SETTINGS_TABLE_NAME, SETTINGS_COLUMNS)
         self.deleter.start()
 
     @discord.app_commands.command(
@@ -27,8 +65,11 @@ class DeletedMessagesLog(commands.Cog):
     async def setup_logger(self, interaction: discord.Interaction, active: bool, channel: discord.TextChannel,
                            clear_after_hours: int):
         settings = (active, channel.name, clear_after_hours)
-        await self.bot.write_json_file(interaction.guild, "deleted_messages_log_settings.json", settings)
-        await interaction.response.send_message("Updated settings.")
+        await write_settings(interaction.guild_id, settings)
+        await interaction.response.send_message(f"Updated settings.\n"
+                                                f"Active: `{active}`\n"
+                                                f"Channel name: `{channel.name}`\n"
+                                                f"Clear after `{clear_after_hours}` hours")
 
     @commands.Cog.listener()
     async def on_message_delete(self, message: discord.Message):
@@ -37,15 +78,14 @@ class DeletedMessagesLog(commands.Cog):
         if message.author.id == self.bot.user.id:
             return
         try:
-            active, channel_name, clear_after_hours = await self.bot.open_json_file(
-                message.guild, "deleted_messages_log_settings.json", list())
+            active, channel_name, clear_after_hours = await fetch_settings(message.guild.id)
         except ValueError:
-            return  # Logger is not set up yet
+            return
         if not active:
             return
-        channel = discord.utils.get(message.guild.channels, name=channel_name)
+        channel: discord.TextChannel = discord.utils.get(message.guild.channels, name=channel_name)
         if not channel:
-            return  # Channel name was changed
+            return
         if channel == message.channel:
             return
 
@@ -62,7 +102,7 @@ class DeletedMessagesLog(commands.Cog):
                              f"\nMention: {message.author.mention}" \
                              f"\nID: {message.author.id}"
 
-        image_files = await self.retrieve_attachments(message)
+        image_files = await retrieve_attachments(message)
         if image_files:
             information_string += f"\nContained **{len(image_files)}** attachments:"
 
@@ -71,34 +111,20 @@ class DeletedMessagesLog(commands.Cog):
                            embed=content_embed,
                            allowed_mentions=discord.AllowedMentions.none())
 
-    async def retrieve_attachments(self, message: discord.Message):
-        if message.attachments:
-            files = list()
-            for attachment in message.attachments:
-                try:
-                    image_file = await attachment.to_file(use_cached=True)
-                    files.append(image_file)
-                except discord.errors.HTTPException:
-                    return None
-            return files
-        else:
-            return None
-
     @tasks.loop(minutes=10.0)
     async def deleter(self):
         await asyncio.sleep(120)
         for guild in self.bot.guilds:
             try:
-                active, channel_name, clear_after_hours = await self.bot.open_json_file(
-                    guild, "deleted_messages_log_settings.json", list())
+                active, channel_name, clear_after_hours = await fetch_settings(guild.id)
             except ValueError:
                 return  # Logger is not set up yet
             if not active:
                 return
-            channel = discord.utils.get(guild.channels, name=channel_name)
+            channel: discord.TextChannel = discord.utils.get(guild.channels, name=channel_name)
             if not channel:
                 return  # Channel name was changed
-            delete_limit = timedelta(hours=24)
+            delete_limit = timedelta(hours=clear_after_hours)
             await channel.purge(before=datetime.utcnow() - delete_limit)
 
 
