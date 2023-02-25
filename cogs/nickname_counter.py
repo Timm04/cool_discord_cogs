@@ -68,9 +68,12 @@ class NicknameCounter(commands.Cog):
         nickname_data = (nickname, count_up_or_down, starting_number, current_date_string)
         user_nickname_data = await fetch_nickname_data(interaction.guild_id)
         user_nickname_data[str(interaction.user.id)] = nickname_data
+        try:
+            await self.update_user_nickname(interaction.user, nickname_data)
+        except discord.errors.Forbidden:
+            await interaction.edit_original_response(content="I'm not allowed to edit your nickname. Exiting...")
         await write_nickname_data(interaction.guild_id, user_nickname_data)
 
-        await self.update_user_nickname(interaction.user, nickname_data)
         await interaction.edit_original_response(content="Changed your nickname!")
 
     async def update_user_nickname(self, member: discord.Member, nickname_data):
@@ -101,7 +104,10 @@ class NicknameCounter(commands.Cog):
         user_nickname_data = await fetch_nickname_data(interaction.guild_id)
         if str(interaction.user.id) in user_nickname_data:
             del user_nickname_data[str(interaction.user.id)]
-            await interaction.user.edit(nick=None)
+            try:
+                await interaction.user.edit(nick=None)
+            except discord.errors.Forbidden:
+                pass
             await write_nickname_data(interaction.guild_id, user_nickname_data)
             await interaction.response.send_message("Cleared your nickname data.")
         else:
@@ -117,7 +123,10 @@ class NicknameCounter(commands.Cog):
                 if not member:
                     continue
                 await asyncio.sleep(5)
-                await self.update_user_nickname(member, user_nickname_data[user_id])
+                try:
+                    await self.update_user_nickname(member, user_nickname_data[user_id])
+                except discord.errors.Forbidden:
+                    pass
 
 
 async def setup(bot):

@@ -158,7 +158,7 @@ async def verify_entry_single(table: str, kwargs):
 
 
 async def update_entry(table, column, value, guild_id=None, **kwargs):
-    value_as_string = json.dumps(value)
+    value_as_string = json.dumps(value).replace("'", "''")
     sq_lite_request_string = f"""UPDATE {table}\nSET {column} = '{value_as_string}'"""
 
     if guild_id:

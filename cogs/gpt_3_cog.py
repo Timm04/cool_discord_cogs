@@ -57,6 +57,7 @@ def generate_message(message: str, api_key: str, user_name: str, default_prompt:
     elif default_prompt:
         prompt_parts.insert(0, default_prompt)
     prompt = "\n".join(prompt_parts)
+    print(f"OpenAI Full Prompt:\n\n {prompt}")
     completion = openai.Completion.create(engine="text-davinci-002",
                                           prompt=prompt,
                                           presence_penalty=2.0,
