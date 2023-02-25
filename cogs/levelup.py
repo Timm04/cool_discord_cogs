@@ -175,7 +175,10 @@ async def fetch_user_rank_name(member: discord.Member):
     rank_system = await fetch_rank_system(member.guild.id)
     rank_names = set([rank_info[5] for rank_info in rank_system]) | set(rank_info[4] for rank_info in rank_system)
     user_rank_names = [role.name for role in member.roles]
-    user_rank_name = list(rank_names & set(user_rank_names))[0]
+    try:
+        user_rank_name = list(rank_names & set(user_rank_names))[0]
+    except IndexError:
+        user_rank_name = "No Rank"
     return user_rank_name
 
 
