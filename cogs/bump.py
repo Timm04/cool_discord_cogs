@@ -121,8 +121,8 @@ async def process_disboard(message: discord.Message):
 
 # Static bump bot information
 
-BUMP_BOTS = {761562078095867916: ("Dissoku", "`/dissoku up`", 60.0, process_dissoku, 4),
-             302050872383242240: ("Disboard", "`/bump`", 120.0, process_disboard, 3)}
+BUMP_BOTS = {761562078095867916: ("Dissoku", "`/dissoku up`", 61.0, process_dissoku, 4),
+             302050872383242240: ("Disboard", "`/bump`", 121.0, process_disboard, 3)}
 
 
 #########################################
