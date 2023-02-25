@@ -85,7 +85,7 @@ using those files.
 
 ## temporary_vc.py
 
-Lets users create temporary voice channels that get cleared on rejoin.
+Lets users create temporary voice channels that get cleared after all users left the channel.
 
 ## user_name_record.py
 
