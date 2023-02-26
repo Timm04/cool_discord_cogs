@@ -57,14 +57,17 @@ def generate_message(message: str, api_key: str, user_name: str, default_prompt:
     elif default_prompt:
         prompt_parts.insert(0, default_prompt)
     prompt = "\n".join(prompt_parts)
+    suffix = f'"""\n{user_name}: """'
     print(f"OpenAI Full Prompt:\n\n {prompt}")
-    completion = openai.Completion.create(engine="text-davinci-002",
+    completion = openai.Completion.create(engine="text-davinci-003",
                                           prompt=prompt,
-                                          presence_penalty=2.0,
-                                          frequency_penalty=2.0,
                                           max_tokens=400,
-                                          suffix=f'"""\n{user_name}: """')
+                                          stop='"""',
+                                          suffix=suffix,
+                                          user=user_name)
     reply = completion['choices'][0]['text']
+    reply = reply.rstrip('"')
+    print(f"OpenAI Full Completion & Suffix: \n\n {reply + suffix}")
     reply = re.sub(r"https?://.*\.\w{2,3}", "<snip>", reply)
     new_history = f'{prompt}{reply}"""'
 
@@ -102,8 +105,11 @@ async def reply_to_message(message: discord.Message, history: str = None):
     try:
         reply, new_history = await generate_message_async(message.clean_content, api_key, cleaned_user_name,
                                                           default_prompt, history)
-        await message.reply(reply,
-                            allowed_mentions=discord.AllowedMentions.none())
+        try:
+            await message.reply(reply,
+                                allowed_mentions=discord.AllowedMentions.none())
+        except discord.errors.HTTPException:
+            await message.reply("What?")
 
     except (openai.error.ServiceUnavailableError, openai.error.RateLimitError, openai.error.APIConnectionError):
         await message.reply("`OpenAI seems to be unavailable right now. Please try again.`")
